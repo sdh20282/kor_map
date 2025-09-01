@@ -145,9 +145,8 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
           label.setAttribute('y', cy);
           label.setAttribute('text-anchor', 'middle');
           label.setAttribute('dominant-baseline', 'central');
-          label.setAttribute('font-size', 12);
-          label.setAttribute('font-weight', 700);
-
+          label.setAttribute('font-size', opts.labels?.fontSize || 12);
+          label.setAttribute('font-weight', opts.labels?.fontWeight || 400);
           label.setAttribute('fill', '#111827');
           label.setAttribute('style', [
             'pointer-events:none',
@@ -262,7 +261,7 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
       svg.querySelectorAll('[fill]').forEach(e=> e.removeAttribute('fill'));
 
       const thresholds = opts.rates  || [0.8, 0.6, 0.4, 0.2];
-      const colors     = opts.colors || ['#00085A','#1F48FF','#79a1ee','#99d9f2','#D7D7D7'];
+      const colors = opts.colors || ['#00085A','#1F48FF','#79a1ee','#99d9f2','#D7D7D7'];
 
       function colorForRate(r){
         if (r == null) return '#D7D7D7';
@@ -304,8 +303,8 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
           label.setAttribute('y', cy);
           label.setAttribute('text-anchor', 'middle');
           label.setAttribute('dominant-baseline', 'central');
-          label.setAttribute('font-size', 12);
-          label.setAttribute('font-weight', 700);
+          label.setAttribute('font-size', opts.labels?.fontSize || 12);
+          label.setAttribute('font-weight', opts.labels?.fontWeight || 400);
           label.setAttribute('fill', '#111827');
           label.setAttribute('style', [
             'pointer-events:none',
@@ -334,14 +333,12 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
         svg.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`);
       }
 
-      const pad = (opts.callouts?.pad ?? 40);
-      const extra = (opts.callouts?.extra ?? 20);
+      const pad = (opts.callouts?.pad ?? 0);
+      const extra = (opts.callouts?.extra ?? 0);
+      const padding = pad + extra;
 
-      svg.setAttribute('viewBox', `${vx - pad - extra} ${vy} ${vw + ((pad + extra) * 2)} ${vh}`);
-
-      // svg.style.overflow = 'visible';
-      // wrap.style.overflow = 'visible';
-
+      svg.setAttribute('viewBox', `${vx - padding} ${vy} ${vw + (padding * 2)} ${vh}`);
+      
       const leftX  = bbox.x - pad;
       const rightX = bbox.x + bbox.w + pad;
 
@@ -357,42 +354,42 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
         let cx = b.x + b.width / 2;
         let cy = b.y + b.height / 2;
 
-        const off = (opts.callouts?.offsets && opts.callouts.offsets[name]) || [0, 0];
+        const off = (callouts?.offsets && callouts.offsets[name]) || [0, 0];
+        const bypass = (callouts?.bypass && callouts.bypass[name]);
 
         cx += off[0];
         cy += off[1];
 
         const leftSide = cx < bbox.cx;
-        const tx = leftSide ? leftX : rightX;
 
-        console.log(name, tx, leftX, rightX);
-        
         const line = document.createElementNS('http://www.w3.org/2000/svg','path');
-        const midX = leftSide ? (cx - 8) : (cx + 8);
-        const d = `M ${cx} ${cy} L ${midX} ${cy} L ${tx * (leftSide ? -1 : 1)} ${cy}`;
+
+        const startX = cx;
+        const endX = leftSide ? leftX : rightX;
+
+        const d = `M${cx},${cy} L${startX},${cy} ${bypass ? `L${startX + bypass[0]},${cy + bypass[1]}` : ''} L${endX + (leftSide ? callouts?.textOffset ?? 0 : -1 * (callouts?.textOffset ?? 0))},${cy + (bypass?.[1] || 0)}`;
 
         line.setAttribute('d', d);
         line.setAttribute('fill','none');
         line.setAttribute('stroke', callouts.lineColor ?? '#9CA3AF');
-        line.setAttribute('stroke-width', '1');
-        line.setAttribute('stroke-dasharray', '2 4');
-
+        line.setAttribute('stroke-width', callouts.lineWidth ?? 1);
+        line.setAttribute('stroke-dasharray', callouts.lineDash ?? '0');
         cg.appendChild(line);
 
         const pin = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         pin.setAttribute('cx', cx);
-        pin.setAttribute('cy', String(cy));
-        pin.setAttribute('r', '2');
-        pin.setAttribute('fill', '#111827');
+        pin.setAttribute('cy', cy);
+        pin.setAttribute('r', callouts.pinSize ?? '2');
+        pin.setAttribute('fill', callouts.pinColor ?? '#1B4EFF');
         cg.appendChild(pin);
 
         const label = document.createElementNS('http://www.w3.org/2000/svg','text');
-
-        label.setAttribute('x', String(tx));
-        label.setAttribute('y', String(cy));
+        label.setAttribute('x', endX);
+        label.setAttribute('y', cy + (bypass?.[1] || 0));
         label.setAttribute('text-anchor', leftSide ? 'end' : 'start');
         label.setAttribute('dominant-baseline', 'middle');
-        label.setAttribute('font-size', 12);
+        label.setAttribute('font-size', callouts.textSize ?? 12);
+        label.setAttribute('font-weight', callouts.textWeight ?? 400);
         label.setAttribute('fill', callouts.textColor ?? '#6B7280');
 
         const countVal = opts.data?.[name]?.count;
@@ -446,6 +443,8 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
           paddingTop: 20,
         },
         labels: {
+          fontSize: 12,
+          fontWeight: 700,
           strokeWidth: 2,
           offsets: { 
             '경기': [20, 20],
@@ -461,6 +460,8 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
         colors: ['#00085A','#1F48FF','#79a1ee','#99d9f2','#D7D7D7'],
         map: { width: 600 },
         labels: {
+          fontSize: 12,
+          fontWeight: 700,
           strokeWidth: 2,
           offsets: {
             '경기': [20, 20],
@@ -468,14 +469,32 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
           },
         },
         callouts: {
-          pad: 0,
-          extra: 0,
+          pad: 40,
+          extra: 100,
+          textSize: 12,
+          textWeight: 700,
           textColor: '#6B7280',
+          textOffset: 4,
+          lineWidth: 2,
+          lineDash: '4 4',
           lineColor: '#9CA3AF',
+          pinColor: '#000000',
+          pinSize: 2,
+          bypass: {
+            '서울': [-20, -20],
+            '경기': [-20, 20],
+            '세종': [-20, 20],
+            '대전': [-20, 20],
+            '부산': [20, 20],
+            '경남': [50, 50],
+          },
           offsets: {
             '경기': [20, 20],
             '충북': [-20, -20],
-            '강원': [20, 20]
+            '강원': [20, 20],
+            '경북': [0, 20],
+            '부산': [0, 10],
+            '경남': [0, 15],
           },
         }
       });
