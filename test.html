@@ -1,0 +1,484 @@
+const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'];<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>대한민국 시·도 SVG 차트 (Vanilla JS)</title>
+  <style>
+    /* Layout */
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Apple SD Gothic Neo, Helvetica, Arial, sans-serif; margin: 0; color: #111827; }
+
+    .page { padding: 28px 24px 60px; width: fit-content; max-width: 1200px; margin: 0 auto; }
+
+    h2 { margin: 0 0 12px; font-size: 28px; }
+
+    .chart { background: #fff; border-radius: 14px; box-shadow: 0 10px 24px rgba(17,24,39,0.08); padding: 20px; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="chart" id="counts">
+      <h2>지역별 분석 문항수</h2>
+      <div id="korea-counts"></div>
+    </div>
+
+    <div class="chart" id="rates">
+      <h2>지역별 확보율</h2>
+      <div id="korea-rates"></div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * 1) 준비: 지역 코드/이름 매핑
+     *  - 제공된 south_korea.svg는 각 path.id가 ISO-3166-2 코드(KR-11 등)여야 합니다.
+     */
+    const NAME_TO_CODE = {
+      '서울': 'KR-11', '부산': 'KR-26', '대구': 'KR-27', '인천': 'KR-28', '광주': 'KR-29',
+      '대전': 'KR-30', '울산': 'KR-31', '세종': 'KR-50', '경기': 'KR-41', '강원': 'KR-42',
+      '충북': 'KR-43', '충남': 'KR-44', '전북': 'KR-45', '전남': 'KR-46', '경북': 'KR-47',
+      '경남': 'KR-48', '제주': 'KR-49'
+    };
+    const CODE_TO_NAME = Object.fromEntries(Object.entries(NAME_TO_CODE).map(([k, v])=>[v, k]));
+
+    /** 숫자 유틸 */
+    const fmtInt = n => (n==null?'-':n.toLocaleString('ko-KR'));
+    const fmtPct = x => (x==null?'-':Math.round(x*100)) + '%';
+
+    /** 색상 보간(단색계열) */
+    function lerp(a,b,t){ return a + (b-a)*t; }
+    function hexToRgb(hex){ const n = hex.replace('#',''); return {r:parseInt(n.substring(0,2),16), g:parseInt(n.substring(2,4),16), b:parseInt(n.substring(4,6),16)}; }
+    function rgbToHex({r,g,b}){ const h=n=>n.toString(16).padStart(2,'0'); return `#${h(r)}${h(g)}${h(b)}`; }
+    function mix(c1,c2,t){ const a=hexToRgb(c1), b=hexToRgb(c2); return rgbToHex({r:Math.round(lerp(a.r,b.r,t)), g:Math.round(lerp(a.g,b.g,t)), b:Math.round(lerp(a.b,b.b,t))}); }
+
+    /** fetch + inline SVG */
+    async function loadSVG(url) { 
+      const res = await fetch(url); 
+      const txt = await res.text(); 
+      
+      const doc = new DOMParser().parseFromString(txt, 'image/svg+xml'); 
+
+      return doc.documentElement;
+    }
+
+    /** 공통: SVG 뷰박스와 전체 bbox를 구함 */
+    function computeBBox(svg){
+      const paths = svg.querySelectorAll('path');
+      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+      paths.forEach(p=>{ const b=p.getBBox(); minX=Math.min(minX,b.x); minY=Math.min(minY,b.y); maxX=Math.max(maxX,b.x+b.width); maxY=Math.max(maxY,b.y+b.height); });
+      return {x:minX, y:minY, width:maxX-minX, height:maxY-minY, cx:(minX+maxX)/2, cy:(minY+maxY)/2};
+    }
+
+
+    async function renderRateMapWithBars(mount, opts){
+      const NAME_TO_CODE = {
+        '서울': 'KR-11', '부산': 'KR-26', '대구': 'KR-27', '인천': 'KR-28', '광주': 'KR-29',
+        '대전': 'KR-30', '울산': 'KR-31', '세종': 'KR-50', '경기': 'KR-41', '강원': 'KR-42',
+        '충북': 'KR-43', '충남': 'KR-44', '전북': 'KR-45', '전남': 'KR-46', '경북': 'KR-47',
+        '경남': 'KR-48', '제주': 'KR-49'
+      };
+
+      async function loadSVG(url) { 
+        const res = await fetch(url); 
+        const txt = await res.text(); 
+        
+        const doc = new DOMParser().parseFromString(txt, 'image/svg+xml'); 
+
+        return doc.documentElement;
+      }
+
+      const fmtPct = x => (x === null || x === undefined ? '-' : Math.round(x * 100)) + '%';
+
+      const el = typeof mount === 'string' ? document.querySelector(mount) : mount;
+      el.innerHTML = '';
+      
+      const wrap = el;
+      wrap.style.position = 'relative';
+      wrap.style.display = 'flex';
+      wrap.style.gap = opts?.gap ? opts?.gap + 'px' : undefined;
+      wrap.style.flexShrink = '0';
+
+      const svg = await loadSVG(opts.svgUrl);
+      svg.style.width = opts.map?.width ? opts.map?.width + 'px' : undefined;
+      svg.style.height = opts.map?.height ? opts.map?.height + 'px' : undefined;
+      
+      wrap.appendChild(svg);
+
+      const labelLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
+      svg.appendChild(labelLayer);
+
+      const thresholds = opts.rates || [0.8, 0.6, 0.4, 0.2];
+      const colors = opts.colors || ['#00085A','#1F48FF','#79a1ee','#99d9f2','#D7D7D7'];
+
+      function colorForRate(r){
+        if (r == null) return '#D7D7D7';
+        if (r >= thresholds[0]) return colors[0];
+        if (r >= thresholds[1]) return colors[1];
+        if (r >= thresholds[2]) return colors[2];
+        if (r >= thresholds[3]) return colors[3];
+
+        return colors[4];
+      }
+
+      for (const [name, code] of Object.entries(NAME_TO_CODE)){
+        const path = svg.getElementById(code);
+
+        if(!path) continue;
+
+        const r = opts.data[name];
+
+        path.style.setProperty('fill', colorForRate(r), 'important');
+
+        const b = path.getBBox();
+        const minW = opts.labels?.minWidth ?? 16;
+        const minH = opts.labels?.minHeight ?? 12;
+
+        if (b.width >= minW && b.height >= minH) {
+          let cx = b.x + b.width / 2;
+          let cy = b.y + b.height / 2;
+          const off = (opts.labels?.offsets && opts.labels.offsets[name]) || [0, 0];
+          cx += off[0];
+          cy += off[1];
+
+          const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+          label.setAttribute('x', cx);
+          label.setAttribute('y', cy);
+          label.setAttribute('text-anchor', 'middle');
+          label.setAttribute('dominant-baseline', 'central');
+          label.setAttribute('font-size', 12);
+          label.setAttribute('font-weight', 700);
+
+          label.setAttribute('fill', '#111827');
+          label.setAttribute('style', [
+            'pointer-events:none',
+            'paint-order:stroke',
+            'stroke:#FFFFFF',
+            `stroke-width:${opts.labels?.strokeWidth ?? 2.5}px`
+          ].join(';'));
+
+          label.textContent = name;
+          labelLayer.appendChild(label);
+        }
+      }
+      
+      const list = document.createElement('div');
+      list.style.display = 'flex';
+      list.style.flexDirection = 'column';
+      list.style.gap = opts.bar?.gap ? opts.bar.gap + 'px' : '20px';
+      list.style.paddingTop = opts.bar?.paddingTop ? opts.bar.paddingTop + 'px' : '0px';
+
+      const rows = Object.entries(opts.data).sort((a, b) => b[1] - a[1]);
+
+      rows.forEach(([name, r]) => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.gap = '10px';
+
+        const span = document.createElement('span');
+        span.style.width = '56px';
+        span.style.flexShrink = '0';
+        span.style.fontWeight = '600';
+        span.style.textAlign = 'right';
+        span.textContent = name;
+        row.appendChild(span);
+
+        const bar = document.createElement('div');
+        bar.style.width = ((opts.bar.width || 100) * r) + 'px';
+        bar.style.height = '100%'
+        bar.style.background = colorForRate(r);
+        row.appendChild(bar);
+
+        const val = document.createElement('div');
+        val.style.width = '44px';
+        val.style.flexShrink = '0';
+        val.style.fontWeight = '600';
+        val.style.textAlign = 'left';
+        val.textContent = fmtPct(r);
+        row.appendChild(val);
+        
+        list.appendChild(row);
+      });
+
+      wrap.appendChild(list);
+    }
+
+    async function renderCountMap(mount, opts){
+      const NAME_TO_CODE = {
+        '서울':'KR-11','부산':'KR-26','대구':'KR-27','인천':'KR-28','광주':'KR-29',
+        '대전':'KR-30','울산':'KR-31','세종':'KR-50','경기':'KR-41','강원':'KR-42',
+        '충북':'KR-43','충남':'KR-44','전북':'KR-45','전남':'KR-46','경북':'KR-47',
+        '경남':'KR-48','제주':'KR-49'
+      };
+
+      const fmtInt = n => (n==null ? '-' : n.toLocaleString('ko-KR'));
+
+      function computeBBox(svg){
+        const paths = svg.querySelectorAll('path');
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        paths.forEach(p => {
+          const b = p.getBBox();
+          
+          minX = Math.min(minX, b.x);
+          minY = Math.min(minY, b.y);
+          maxX = Math.max(maxX, b.x + b.width);
+          maxY = Math.max(maxY, b.y + b.height);
+        });
+
+        return { x: minX, y: minY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2 };
+      }
+
+      async function loadSVG(url){
+        const res = await fetch(url);
+        const txt = await res.text();
+        const doc = new DOMParser().parseFromString(txt,'image/svg+xml');
+
+        return doc.documentElement;
+      }
+
+      const el = typeof mount==='string' ? document.querySelector(mount) : mount;
+      el.innerHTML = '';
+
+      const wrap = el;
+
+      wrap.style.position = 'relative';
+      wrap.style.display  = 'flex';
+      wrap.style.alignItems = 'center';
+      wrap.style.justifyContent = 'center';
+      wrap.style.flexShrink = '0';
+      wrap.style.gap = opts?.gap ? opts.gap + 'px' : undefined;
+
+      const svg = await loadSVG(opts.svgUrl);
+      svg.style.width = opts.map?.width ? opts.map?.width + 'px' : undefined;
+      svg.style.height = opts.map?.height ? opts.map?.height + 'px' : undefined;
+
+      wrap.appendChild(svg);
+
+      svg.querySelectorAll('style').forEach(s => {
+        s.textContent = s.textContent.replace(/fill\s*:[^;]+;?/g,'');
+      });
+      svg.querySelectorAll('[fill]').forEach(e=> e.removeAttribute('fill'));
+
+      const thresholds = opts.rates  || [0.8, 0.6, 0.4, 0.2];
+      const colors     = opts.colors || ['#00085A','#1F48FF','#79a1ee','#99d9f2','#D7D7D7'];
+
+      function colorForRate(r){
+        if (r == null) return '#D7D7D7';
+        if (r >= thresholds[0]) return colors[0];
+        if (r >= thresholds[1]) return colors[1];
+        if (r >= thresholds[2]) return colors[2];
+        if (r >= thresholds[3]) return colors[3];
+
+        return colors[4];
+      }
+
+      const labelLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
+      svg.appendChild(labelLayer);
+
+      for (const [name, code] of Object.entries(NAME_TO_CODE)){
+        const path = svg.getElementById(code);
+
+        if(!path) continue;
+
+        const region = opts.data?.[name];
+        const r = region?.rate;
+
+        path.style.setProperty('fill', colorForRate(r), 'important');
+
+        const b = path.getBBox();
+        const minW = opts.labels?.minWidth ?? 16;
+        const minH = opts.labels?.minHeight ?? 12;
+
+        if (b.width >= minW && b.height >= minH) {
+          let cx = b.x + b.width / 2;
+          let cy = b.y + b.height / 2;
+          const off = (opts.labels?.offsets && opts.labels.offsets[name]) || [0, 0];
+
+          cx += off[0];
+          cy += off[1];
+
+          const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+          label.setAttribute('x', cx);
+          label.setAttribute('y', cy);
+          label.setAttribute('text-anchor', 'middle');
+          label.setAttribute('dominant-baseline', 'central');
+          label.setAttribute('font-size', 12);
+          label.setAttribute('font-weight', 700);
+          label.setAttribute('fill', '#111827');
+          label.setAttribute('style', [
+            'pointer-events:none',
+            'paint-order:stroke',
+            'stroke:#FFFFFF',
+            `stroke-width:${opts.labels?.strokeWidth ?? 2.5}px`
+          ].join(';'));
+          label.textContent = name;
+          labelLayer.appendChild(label);
+        }
+      }
+
+      const callouts = opts.callouts ?? {};
+      const showPin   = callouts.showPin ?? true;
+
+      const bbox = computeBBox(svg);
+      const vbStr = svg.getAttribute('viewBox');
+
+      let vx, vy, vw, vh;
+
+      if (vbStr) {
+        [vx, vy, vw, vh] = vbStr.split(/\s+/).map(Number);
+      } else {
+        vx = bbox.x; vy = bbox.y; vw = bbox.w; vh = bbox.h;
+
+        svg.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`);
+      }
+
+      const pad = (opts.callouts?.pad ?? 40);
+      const extra = (opts.callouts?.extra ?? 20);
+
+      svg.setAttribute('viewBox', `${vx - pad - extra} ${vy} ${vw + ((pad + extra) * 2)} ${vh}`);
+
+      // svg.style.overflow = 'visible';
+      // wrap.style.overflow = 'visible';
+
+      const leftX  = bbox.x - pad;
+      const rightX = bbox.x + bbox.w + pad;
+
+      const cg = document.createElementNS('http://www.w3.org/2000/svg','g');
+      svg.appendChild(cg);
+
+      for (const [name, code] of Object.entries(NAME_TO_CODE)){
+        const path = svg.getElementById(code);
+        if(!path) continue;
+
+        const b = path.getBBox();
+        let cx = b.x + b.width / 2;
+        let cy = b.y + b.height / 2;
+
+        const off = (opts.labels?.offsets && opts.labels.offsets[name]) || [0, 0];
+
+        cx += off[0];
+        cy += off[1];
+
+        const leftSide = cx < bbox.cx;
+        const tx = leftSide ? leftX : rightX;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg','path');
+        const midX = leftSide ? (cx - 8) : (cx + 8);
+        const d = `M ${cx} ${cy} L ${midX} ${cy} L ${tx * (leftSide ? -1 : 1)} ${cy}`;
+        
+        line.setAttribute('d', d);
+        line.setAttribute('fill','none');
+        line.setAttribute('stroke', callouts.lineColor ?? '#9CA3AF');
+        line.setAttribute('stroke-width', '1');
+        line.setAttribute('stroke-dasharray', '2 4');
+
+        cg.appendChild(line);
+
+        // if (showPin) {
+        //   const pin = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        //   pin.setAttribute('cx', cx);
+        //   pin.setAttribute('cy', String(cy));
+        //   pin.setAttribute('r', '1.8');
+        //   pin.setAttribute('fill', '#111827');
+        //   cg.appendChild(pin);
+        // }
+
+        const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+
+        label.setAttribute('x', String(tx));
+        label.setAttribute('y', String(cy));
+        label.setAttribute('text-anchor', leftSide ? 'end' : 'start');
+        label.setAttribute('dominant-baseline', 'middle');
+        label.setAttribute('font-size', 12);
+        label.setAttribute('fill', callouts.textColor ?? '#6B7280');
+
+        const countVal = opts.data?.[name]?.count;
+        label.textContent = `${name} : ${fmtInt(countVal)}`;
+        
+        cg.appendChild(label);
+      }
+    }
+
+    // 더미 데이터
+    const countsData = {
+      '서울': { count: 4339, rate: 0.93 },
+      '인천': { count: 1406, rate: 0.80 },
+      '경기': { count: 5331, rate: 0.63 },
+      '세종': { count: 286,  rate: 0.74 },
+      '충남': { count: 674,  rate: 0.40 },
+      '대전': { count: 849,  rate: 0.76 },
+      '전북': { count: 705,  rate: 0.34 },
+      '광주': { count: 969,  rate: 0.87 },
+      '전남': { count: 226,  rate: 0.11 },
+      '제주': { count: 346,  rate: 0.61 },
+      '강원': { count: 147,  rate: 0.08 },
+      '충북': { count: 351,  rate: 0.31 },
+      '경북': { count: 581,  rate: 0.22 },
+      '대구': { count: 1364, rate: 0.93 },
+      '울산': { count: 690,  rate: 0.80 },
+      '부산': { count: 958,  rate: 0.50 },
+      '경남': { count: 529,  rate: 0.20 },
+    };
+
+    const ratesData = {
+      '대구': 0.93, '서울': 0.87, '광주': 0.87, '울산': 0.80, '대전': 0.76, '세종': 0.74,
+      '인천': 0.80, '경기': 0.63, '제주': 0.61, '부산': 0.50, '충남': 0.40, '전북': 0.34,
+      '충북': 0.31, '경북': 0.22, '경남': 0.20, '전남': 0.11, '강원': 0.08
+    };
+
+    // ======== 실행 ========
+    (async function(){
+      await renderRateMapWithBars('#korea-rates', {
+        svgUrl: 'south_korea.svg',
+        data: ratesData,
+        rates: [0.8, 0.6, 0.4, 0.2],
+        colors: ['#00085A','#1F48FF','#79a1ee','#99d9f2','#D7D7D7'],
+        gap: 40,
+        map: {
+          width: 400,
+        },
+        bar: {
+          width: 400,
+          gap: 16,
+          paddingTop: 20,
+        },
+        labels: {
+          strokeWidth: 2,
+          offsets: { 
+            '경기': [20, 20],
+            '충북': [-20, -20],
+          },
+        }
+      });
+
+      await renderCountMap('#korea-counts', {
+        svgUrl: 'south_korea.svg',
+        data: countsData,
+        rates: [0.8, 0.6, 0.4, 0.2],
+        colors: ['#00085A','#1F48FF','#79a1ee','#99d9f2','#D7D7D7'],
+        map: { width: 600 },
+        labels: {
+          strokeWidth: 2,
+          offsets: {
+            '경기': [20, 20],
+            '충북': [-10, -30],
+          },
+        },
+        callouts: {
+          pad: 0,
+          extra: 80,
+          textColor: '#6B7280',
+          lineColor: '#9CA3AF',
+          showPin: true,
+          offsets: {
+            '경기': [20, 20],
+            '충북': [-20, -20],
+          },
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
