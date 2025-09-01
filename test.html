@@ -350,13 +350,14 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
 
       for (const [name, code] of Object.entries(NAME_TO_CODE)){
         const path = svg.getElementById(code);
+        
         if(!path) continue;
 
         const b = path.getBBox();
         let cx = b.x + b.width / 2;
         let cy = b.y + b.height / 2;
 
-        const off = (opts.labels?.offsets && opts.labels.offsets[name]) || [0, 0];
+        const off = (opts.callouts?.offsets && opts.callouts.offsets[name]) || [0, 0];
 
         cx += off[0];
         cy += off[1];
@@ -364,10 +365,12 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
         const leftSide = cx < bbox.cx;
         const tx = leftSide ? leftX : rightX;
 
+        console.log(name, tx, leftX, rightX);
+        
         const line = document.createElementNS('http://www.w3.org/2000/svg','path');
         const midX = leftSide ? (cx - 8) : (cx + 8);
         const d = `M ${cx} ${cy} L ${midX} ${cy} L ${tx * (leftSide ? -1 : 1)} ${cy}`;
-        
+
         line.setAttribute('d', d);
         line.setAttribute('fill','none');
         line.setAttribute('stroke', callouts.lineColor ?? '#9CA3AF');
@@ -376,14 +379,12 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
 
         cg.appendChild(line);
 
-        // if (showPin) {
-        //   const pin = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        //   pin.setAttribute('cx', cx);
-        //   pin.setAttribute('cy', String(cy));
-        //   pin.setAttribute('r', '1.8');
-        //   pin.setAttribute('fill', '#111827');
-        //   cg.appendChild(pin);
-        // }
+        const pin = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        pin.setAttribute('cx', cx);
+        pin.setAttribute('cy', String(cy));
+        pin.setAttribute('r', '2');
+        pin.setAttribute('fill', '#111827');
+        cg.appendChild(pin);
 
         const label = document.createElementNS('http://www.w3.org/2000/svg','text');
 
@@ -468,13 +469,13 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
         },
         callouts: {
           pad: 0,
-          extra: 80,
+          extra: 0,
           textColor: '#6B7280',
           lineColor: '#9CA3AF',
-          showPin: true,
           offsets: {
             '경기': [20, 20],
             '충북': [-20, -20],
+            '강원': [20, 20]
           },
         }
       });
