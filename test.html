@@ -1,11 +1,10 @@
-const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'];<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>대한민국 시·도 SVG 차트 (Vanilla JS)</title>
   <style>
-    /* Layout */
     body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Apple SD Gothic Neo, Helvetica, Arial, sans-serif; margin: 0; color: #111827; }
 
     .page { padding: 28px 24px 60px; width: fit-content; max-width: 1200px; margin: 0 auto; }
@@ -29,373 +28,344 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
   </div>
 
   <script>
-    /**
-     * 1) 준비: 지역 코드/이름 매핑
-     *  - 제공된 south_korea.svg는 각 path.id가 ISO-3166-2 코드(KR-11 등)여야 합니다.
-     */
-    const NAME_TO_CODE = {
-      '서울': 'KR-11', '부산': 'KR-26', '대구': 'KR-27', '인천': 'KR-28', '광주': 'KR-29',
-      '대전': 'KR-30', '울산': 'KR-31', '세종': 'KR-50', '경기': 'KR-41', '강원': 'KR-42',
-      '충북': 'KR-43', '충남': 'KR-44', '전북': 'KR-45', '전남': 'KR-46', '경북': 'KR-47',
-      '경남': 'KR-48', '제주': 'KR-49'
-    };
-    const CODE_TO_NAME = Object.fromEntries(Object.entries(NAME_TO_CODE).map(([k, v])=>[v, k]));
+    class KorMapChart {
+      constructor() {}
 
-    /** 숫자 유틸 */
-    const fmtInt = n => (n==null?'-':n.toLocaleString('ko-KR'));
-    const fmtPct = x => (x==null?'-':Math.round(x*100)) + '%';
+      static async renderRateMapWithBars(mount, opts){
+        const NAME_TO_CODE = {
+          '서울': 'KR-11', '부산': 'KR-26', '대구': 'KR-27', '인천': 'KR-28', '광주': 'KR-29',
+          '대전': 'KR-30', '울산': 'KR-31', '세종': 'KR-50', '경기': 'KR-41', '강원': 'KR-42',
+          '충북': 'KR-43', '충남': 'KR-44', '전북': 'KR-45', '전남': 'KR-46', '경북': 'KR-47',
+          '경남': 'KR-48', '제주': 'KR-49'
+        };
 
-    /** 색상 보간(단색계열) */
-    function lerp(a,b,t){ return a + (b-a)*t; }
-    function hexToRgb(hex){ const n = hex.replace('#',''); return {r:parseInt(n.substring(0,2),16), g:parseInt(n.substring(2,4),16), b:parseInt(n.substring(4,6),16)}; }
-    function rgbToHex({r,g,b}){ const h=n=>n.toString(16).padStart(2,'0'); return `#${h(r)}${h(g)}${h(b)}`; }
-    function mix(c1,c2,t){ const a=hexToRgb(c1), b=hexToRgb(c2); return rgbToHex({r:Math.round(lerp(a.r,b.r,t)), g:Math.round(lerp(a.g,b.g,t)), b:Math.round(lerp(a.b,b.b,t))}); }
-
-    /** fetch + inline SVG */
-    async function loadSVG(url) { 
-      const res = await fetch(url); 
-      const txt = await res.text(); 
-      
-      const doc = new DOMParser().parseFromString(txt, 'image/svg+xml'); 
-
-      return doc.documentElement;
-    }
-
-    /** 공통: SVG 뷰박스와 전체 bbox를 구함 */
-    function computeBBox(svg){
-      const paths = svg.querySelectorAll('path');
-      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
-      paths.forEach(p=>{ const b=p.getBBox(); minX=Math.min(minX,b.x); minY=Math.min(minY,b.y); maxX=Math.max(maxX,b.x+b.width); maxY=Math.max(maxY,b.y+b.height); });
-      return {x:minX, y:minY, width:maxX-minX, height:maxY-minY, cx:(minX+maxX)/2, cy:(minY+maxY)/2};
-    }
-
-
-    async function renderRateMapWithBars(mount, opts){
-      const NAME_TO_CODE = {
-        '서울': 'KR-11', '부산': 'KR-26', '대구': 'KR-27', '인천': 'KR-28', '광주': 'KR-29',
-        '대전': 'KR-30', '울산': 'KR-31', '세종': 'KR-50', '경기': 'KR-41', '강원': 'KR-42',
-        '충북': 'KR-43', '충남': 'KR-44', '전북': 'KR-45', '전남': 'KR-46', '경북': 'KR-47',
-        '경남': 'KR-48', '제주': 'KR-49'
-      };
-
-      async function loadSVG(url) { 
-        const res = await fetch(url); 
-        const txt = await res.text(); 
-        
-        const doc = new DOMParser().parseFromString(txt, 'image/svg+xml'); 
-
-        return doc.documentElement;
-      }
-
-      const fmtPct = x => (x === null || x === undefined ? '-' : Math.round(x * 100)) + '%';
-
-      const el = typeof mount === 'string' ? document.querySelector(mount) : mount;
-      el.innerHTML = '';
-      
-      const wrap = el;
-      wrap.style.position = 'relative';
-      wrap.style.display = 'flex';
-      wrap.style.gap = opts?.gap ? opts?.gap + 'px' : undefined;
-      wrap.style.flexShrink = '0';
-
-      const svg = await loadSVG(opts.svgUrl);
-      svg.style.width = opts.map?.width ? opts.map?.width + 'px' : undefined;
-      svg.style.height = opts.map?.height ? opts.map?.height + 'px' : undefined;
-      
-      wrap.appendChild(svg);
-
-      const labelLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
-      svg.appendChild(labelLayer);
-
-      const thresholds = opts.rates || [0.8, 0.6, 0.4, 0.2];
-      const colors = opts.colors || ['#00085A','#1F48FF','#79a1ee','#99d9f2','#D7D7D7'];
-
-      function colorForRate(r){
-        if (r == null) return '#D7D7D7';
-        if (r >= thresholds[0]) return colors[0];
-        if (r >= thresholds[1]) return colors[1];
-        if (r >= thresholds[2]) return colors[2];
-        if (r >= thresholds[3]) return colors[3];
-
-        return colors[4];
-      }
-
-      for (const [name, code] of Object.entries(NAME_TO_CODE)){
-        const path = svg.getElementById(code);
-
-        if(!path) continue;
-
-        const r = opts.data[name];
-
-        path.style.setProperty('fill', colorForRate(r), 'important');
-
-        const b = path.getBBox();
-        const minW = opts.labels?.minWidth ?? 16;
-        const minH = opts.labels?.minHeight ?? 12;
-
-        if (b.width >= minW && b.height >= minH) {
-          let cx = b.x + b.width / 2;
-          let cy = b.y + b.height / 2;
-          const off = (opts.labels?.offsets && opts.labels.offsets[name]) || [0, 0];
-          cx += off[0];
-          cy += off[1];
-
-          const label = document.createElementNS('http://www.w3.org/2000/svg','text');
-          label.setAttribute('x', cx);
-          label.setAttribute('y', cy);
-          label.setAttribute('text-anchor', 'middle');
-          label.setAttribute('dominant-baseline', 'central');
-          label.setAttribute('font-size', opts.labels?.fontSize || 12);
-          label.setAttribute('font-weight', opts.labels?.fontWeight || 400);
-          label.setAttribute('fill', '#111827');
-          label.setAttribute('style', [
-            'pointer-events:none',
-            'paint-order:stroke',
-            'stroke:#FFFFFF',
-            `stroke-width:${opts.labels?.strokeWidth ?? 2.5}px`
-          ].join(';'));
-
-          label.textContent = name;
-          labelLayer.appendChild(label);
-        }
-      }
-      
-      const list = document.createElement('div');
-      list.style.display = 'flex';
-      list.style.flexDirection = 'column';
-      list.style.gap = opts.bar?.gap ? opts.bar.gap + 'px' : '20px';
-      list.style.paddingTop = opts.bar?.paddingTop ? opts.bar.paddingTop + 'px' : '0px';
-
-      const rows = Object.entries(opts.data).sort((a, b) => b[1] - a[1]);
-
-      rows.forEach(([name, r]) => {
-        const row = document.createElement('div');
-        row.style.display = 'flex';
-        row.style.alignItems = 'center';
-        row.style.gap = '10px';
-
-        const span = document.createElement('span');
-        span.style.width = '56px';
-        span.style.flexShrink = '0';
-        span.style.fontWeight = '600';
-        span.style.textAlign = 'right';
-        span.textContent = name;
-        row.appendChild(span);
-
-        const bar = document.createElement('div');
-        bar.style.width = ((opts.bar.width || 100) * r) + 'px';
-        bar.style.height = '100%'
-        bar.style.background = colorForRate(r);
-        row.appendChild(bar);
-
-        const val = document.createElement('div');
-        val.style.width = '44px';
-        val.style.flexShrink = '0';
-        val.style.fontWeight = '600';
-        val.style.textAlign = 'left';
-        val.textContent = fmtPct(r);
-        row.appendChild(val);
-        
-        list.appendChild(row);
-      });
-
-      wrap.appendChild(list);
-    }
-
-    async function renderCountMap(mount, opts){
-      const NAME_TO_CODE = {
-        '서울':'KR-11','부산':'KR-26','대구':'KR-27','인천':'KR-28','광주':'KR-29',
-        '대전':'KR-30','울산':'KR-31','세종':'KR-50','경기':'KR-41','강원':'KR-42',
-        '충북':'KR-43','충남':'KR-44','전북':'KR-45','전남':'KR-46','경북':'KR-47',
-        '경남':'KR-48','제주':'KR-49'
-      };
-
-      const fmtInt = n => (n==null ? '-' : n.toLocaleString('ko-KR'));
-
-      function computeBBox(svg){
-        const paths = svg.querySelectorAll('path');
-
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-        paths.forEach(p => {
-          const b = p.getBBox();
+        async function loadSVG(url) { 
+          const res = await fetch(url); 
+          const txt = await res.text(); 
           
-          minX = Math.min(minX, b.x);
-          minY = Math.min(minY, b.y);
-          maxX = Math.max(maxX, b.x + b.width);
-          maxY = Math.max(maxY, b.y + b.height);
+          const doc = new DOMParser().parseFromString(txt, 'image/svg+xml'); 
+
+          return doc.documentElement;
+        }
+
+        const fmtPct = x => (x === null || x === undefined ? '-' : Math.round(x * 100)) + '%';
+
+        const el = typeof mount === 'string' ? document.querySelector(mount) : mount;
+        el.innerHTML = '';
+        
+        const wrap = el;
+        wrap.style.setProperty('position','relative');
+        wrap.style.setProperty('display','flex');
+        wrap.style.setProperty('flex-shrink','0');
+        wrap.style.setProperty('gap', opts?.gap ? opts.gap + 'px' : undefined);
+
+        const svg = await loadSVG(opts.svgUrl);
+        svg.style.width = opts.map?.width ? opts.map?.width + 'px' : undefined;
+        svg.style.height = opts.map?.height ? opts.map?.height + 'px' : undefined;
+        
+        wrap.appendChild(svg);
+
+        const labelLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
+        svg.appendChild(labelLayer);
+
+        const thresholds = opts.rates || [0.8, 0.6, 0.4, 0.2];
+        const colors = opts.colors || ['#00085A','#1F48FF','#79a1ee','#99d9f2','#D7D7D7'];
+
+        function colorForRate(r){
+          if (r == null) return '#D7D7D7';
+          if (r >= thresholds[0]) return colors[0];
+          if (r >= thresholds[1]) return colors[1];
+          if (r >= thresholds[2]) return colors[2];
+          if (r >= thresholds[3]) return colors[3];
+
+          return colors[4];
+        }
+
+        for (const [name, code] of Object.entries(NAME_TO_CODE)){
+          const path = svg.getElementById(code);
+
+          if(!path) continue;
+
+          const r = opts.data[name];
+
+          path.style.setProperty('fill', colorForRate(r), 'important');
+
+          const b = path.getBBox();
+          const minW = opts.labels?.minWidth ?? 16;
+          const minH = opts.labels?.minHeight ?? 12;
+
+          if (b.width >= minW && b.height >= minH) {
+            let cx = b.x + b.width / 2;
+            let cy = b.y + b.height / 2;
+            const off = (opts.labels?.offsets && opts.labels.offsets[name]) || [0, 0];
+            cx += off[0];
+            cy += off[1];
+
+            const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+            label.setAttribute('x', cx);
+            label.setAttribute('y', cy);
+            label.setAttribute('text-anchor', 'middle');
+            label.setAttribute('dominant-baseline', 'central');
+            label.setAttribute('font-size', opts.labels?.fontSize || 12);
+            label.setAttribute('font-weight', opts.labels?.fontWeight || 400);
+            label.setAttribute('fill', '#111827');
+            label.setAttribute('style', [
+              'pointer-events:none',
+              'paint-order:stroke',
+              'stroke:#FFFFFF',
+              `stroke-width:${opts.labels?.strokeWidth ?? 2.5}px`
+            ].join(';'));
+
+            label.textContent = name;
+            labelLayer.appendChild(label);
+          }
+        }
+        
+        const list = document.createElement('div');
+        list.style.display = 'flex';
+        list.style.flexDirection = 'column';
+        list.style.gap = opts.bar?.gap ? opts.bar.gap + 'px' : '20px';
+        list.style.paddingTop = opts.bar?.paddingTop ? opts.bar.paddingTop + 'px' : '0px';
+
+        const rows = Object.entries(opts.data).sort((a, b) => b[1] - a[1]);
+
+        rows.forEach(([name, r]) => {
+          const row = document.createElement('div');
+          row.style.setProperty('height', opts.bar?.height ? opts.bar.height + 'px' : '20px');
+          row.style.setProperty('display', 'flex');
+          row.style.setProperty('align-items', 'center');
+          row.style.setProperty('gap', opts.bar?.rowGap ? opts.bar.rowGap + 'px' : '8px');
+
+          const span = document.createElement('span');
+          span.style.setProperty('display', 'inline-block');
+          span.style.setProperty('width', opts.bar?.labelWidth ? opts.bar.labelWidth + 'px' : '56px');
+          span.style.setProperty('flex-shrink', '0');
+          span.style.setProperty('font-size', opts.bar?.labelSize ? opts.bar.labelSize + 'px' : '12px');
+          span.style.setProperty('font-weight', opts.bar?.labelWeight ? opts.bar.labelWeight : '600');
+          span.style.setProperty('color', opts.bar?.labelColor ? opts.bar.labelColor : '#111827');
+          span.style.setProperty('text-align', opts.bar?.labelAlign ? opts.bar.labelAlign : 'right');
+          span.textContent = name;
+          row.appendChild(span);
+
+          const bar = document.createElement('div');
+          bar.style.setProperty('width', ((opts.bar.width || 100) * r) + 'px');
+          bar.style.setProperty('height', '100%');
+          bar.style.setProperty('border-radius', opts.bar?.rounded ? opts.bar.rounded + 'px' : '4px');
+          bar.style.setProperty('background', colorForRate(r));
+          row.appendChild(bar);
+
+          const val = document.createElement('span');
+          val.style.setProperty('display', 'inline-block');
+          val.style.setProperty('width', 'fit-content');
+          val.style.setProperty('flex-shrink', '0');
+          val.style.setProperty('font-size', opts.bar?.valueSize ? opts.bar.valueSize + 'px' : '12px');
+          val.style.setProperty('font-weight', opts.bar?.valueWeight ? opts.bar.valueWeight : '600');
+          val.style.setProperty('color', opts.bar?.valueColor ? opts.bar.valueColor : '#111827');
+
+          val.style.textAlign = 'left';
+          val.textContent = fmtPct(r);
+          row.appendChild(val);
+          
+          list.appendChild(row);
         });
 
-        return { x: minX, y: minY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2 };
+        wrap.appendChild(list);
       }
 
-      async function loadSVG(url){
-        const res = await fetch(url);
-        const txt = await res.text();
-        const doc = new DOMParser().parseFromString(txt,'image/svg+xml');
+      static async renderCountMap(mount, opts){
+        const NAME_TO_CODE = {
+          '서울':'KR-11','부산':'KR-26','대구':'KR-27','인천':'KR-28','광주':'KR-29',
+          '대전':'KR-30','울산':'KR-31','세종':'KR-50','경기':'KR-41','강원':'KR-42',
+          '충북':'KR-43','충남':'KR-44','전북':'KR-45','전남':'KR-46','경북':'KR-47',
+          '경남':'KR-48','제주':'KR-49'
+        };
 
-        return doc.documentElement;
-      }
+        const fmtInt = n => (n==null ? '-' : n.toLocaleString('ko-KR'));
 
-      const el = typeof mount==='string' ? document.querySelector(mount) : mount;
-      el.innerHTML = '';
+        function computeBBox(svg){
+          const paths = svg.querySelectorAll('path');
 
-      const wrap = el;
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-      wrap.style.position = 'relative';
-      wrap.style.display  = 'flex';
-      wrap.style.alignItems = 'center';
-      wrap.style.justifyContent = 'center';
-      wrap.style.flexShrink = '0';
-      wrap.style.gap = opts?.gap ? opts.gap + 'px' : undefined;
+          paths.forEach(p => {
+            const b = p.getBBox();
+            
+            minX = Math.min(minX, b.x);
+            minY = Math.min(minY, b.y);
+            maxX = Math.max(maxX, b.x + b.width);
+            maxY = Math.max(maxY, b.y + b.height);
+          });
 
-      const svg = await loadSVG(opts.svgUrl);
-      svg.style.width = opts.map?.width ? opts.map?.width + 'px' : undefined;
-      svg.style.height = opts.map?.height ? opts.map?.height + 'px' : undefined;
+          return { x: minX, y: minY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2 };
+        }
 
-      wrap.appendChild(svg);
+        async function loadSVG(url){
+          const res = await fetch(url);
+          const txt = await res.text();
+          const doc = new DOMParser().parseFromString(txt,'image/svg+xml');
 
-      svg.querySelectorAll('style').forEach(s => {
-        s.textContent = s.textContent.replace(/fill\s*:[^;]+;?/g,'');
-      });
-      svg.querySelectorAll('[fill]').forEach(e=> e.removeAttribute('fill'));
+          return doc.documentElement;
+        }
 
-      const thresholds = opts.rates  || [0.8, 0.6, 0.4, 0.2];
-      const colors = opts.colors || ['#00085A','#1F48FF','#79a1ee','#99d9f2','#D7D7D7'];
+        const el = typeof mount==='string' ? document.querySelector(mount) : mount;
+        el.innerHTML = '';
 
-      function colorForRate(r){
-        if (r == null) return '#D7D7D7';
-        if (r >= thresholds[0]) return colors[0];
-        if (r >= thresholds[1]) return colors[1];
-        if (r >= thresholds[2]) return colors[2];
-        if (r >= thresholds[3]) return colors[3];
+        const wrap = el;
+        wrap.style.setProperty('position','relative');
+        wrap.style.setProperty('display','flex');
+        wrap.style.setProperty('align-items','center');
+        wrap.style.setProperty('justify-content','center');
+        wrap.style.setProperty('flex-shrink','0');
+        wrap.style.setProperty('gap', opts?.gap ? opts.gap + 'px' : undefined);
 
-        return colors[4];
-      }
+        const svg = await loadSVG(opts.svgUrl);
+        svg.style.setProperty('width', opts.map?.width ? opts.map?.width + 'px' : undefined);
+        svg.style.setProperty('height', opts.map?.height ? opts.map?.height + 'px' : undefined);
 
-      const labelLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
-      svg.appendChild(labelLayer);
+        wrap.appendChild(svg);
 
-      for (const [name, code] of Object.entries(NAME_TO_CODE)){
-        const path = svg.getElementById(code);
+        svg.querySelectorAll('style').forEach(s => {
+          s.textContent = s.textContent.replace(/fill\s*:[^;]+;?/g,'');
+        });
+        svg.querySelectorAll('[fill]').forEach(e=> e.removeAttribute('fill'));
 
-        if(!path) continue;
+        const thresholds = opts.rates  || [0.8, 0.6, 0.4, 0.2];
+        const colors = opts.colors || ['#00085A','#1F48FF','#79a1ee','#99d9f2','#D7D7D7'];
 
-        const region = opts.data?.[name];
-        const r = region?.rate;
+        function colorForRate(r){
+          if (r == null) return '#D7D7D7';
+          if (r >= thresholds[0]) return colors[0];
+          if (r >= thresholds[1]) return colors[1];
+          if (r >= thresholds[2]) return colors[2];
+          if (r >= thresholds[3]) return colors[3];
 
-        path.style.setProperty('fill', colorForRate(r), 'important');
+          return colors[4];
+        }
 
-        const b = path.getBBox();
-        const minW = opts.labels?.minWidth ?? 16;
-        const minH = opts.labels?.minHeight ?? 12;
+        const labelLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
+        svg.appendChild(labelLayer);
 
-        if (b.width >= minW && b.height >= minH) {
+        for (const [name, code] of Object.entries(NAME_TO_CODE)){
+          const path = svg.getElementById(code);
+
+          if(!path) continue;
+
+          const region = opts.data?.[name];
+          const r = region?.rate;
+
+          path.style.setProperty('fill', colorForRate(r), 'important');
+
+          const b = path.getBBox();
+          const minW = opts.labels?.minWidth ?? 16;
+          const minH = opts.labels?.minHeight ?? 12;
+
+          if (b.width >= minW && b.height >= minH) {
+            let cx = b.x + b.width / 2;
+            let cy = b.y + b.height / 2;
+            const off = (opts.labels?.offsets && opts.labels.offsets[name]) || [0, 0];
+
+            cx += off[0];
+            cy += off[1];
+
+            const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+            label.setAttribute('x', cx);
+            label.setAttribute('y', cy);
+            label.setAttribute('text-anchor', 'middle');
+            label.setAttribute('dominant-baseline', 'central');
+            label.setAttribute('font-size', opts.labels?.fontSize || 12);
+            label.setAttribute('font-weight', opts.labels?.fontWeight || 400);
+            label.setAttribute('fill', '#111827');
+            label.setAttribute('style', [
+              'pointer-events:none',
+              'paint-order:stroke',
+              'stroke:#FFFFFF',
+              `stroke-width:${opts.labels?.strokeWidth ?? 2.5}px`
+            ].join(';'));
+            label.textContent = name;
+            labelLayer.appendChild(label);
+          }
+        }
+
+        const callouts = opts.callouts ?? {};
+        const showPin   = callouts.showPin ?? true;
+
+        const bbox = computeBBox(svg);
+        const vbStr = svg.getAttribute('viewBox');
+
+        let vx, vy, vw, vh;
+
+        if (vbStr) {
+          [vx, vy, vw, vh] = vbStr.split(/\s+/).map(Number);
+        } else {
+          vx = bbox.x; vy = bbox.y; vw = bbox.w; vh = bbox.h;
+
+          svg.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`);
+        }
+
+        const pad = (opts.callouts?.pad ?? 0);
+        const extra = (opts.callouts?.extra ?? 0);
+        const padding = pad + extra;
+
+        svg.setAttribute('viewBox', `${vx - padding} ${vy} ${vw + (padding * 2)} ${vh}`);
+        
+        const leftX  = bbox.x - pad;
+        const rightX = bbox.x + bbox.w + pad;
+
+        const cg = document.createElementNS('http://www.w3.org/2000/svg','g');
+        svg.appendChild(cg);
+
+        for (const [name, code] of Object.entries(NAME_TO_CODE)){
+          const path = svg.getElementById(code);
+          
+          if(!path) continue;
+
+          const b = path.getBBox();
           let cx = b.x + b.width / 2;
           let cy = b.y + b.height / 2;
-          const off = (opts.labels?.offsets && opts.labels.offsets[name]) || [0, 0];
+
+          const off = (callouts?.offsets && callouts.offsets[name]) || [0, 0];
+          const bypass = (callouts?.bypass && callouts.bypass[name]);
 
           cx += off[0];
           cy += off[1];
 
+          const leftSide = cx < bbox.cx;
+
+          const line = document.createElementNS('http://www.w3.org/2000/svg','path');
+
+          const startX = cx;
+          const endX = leftSide ? leftX : rightX;
+
+          const d = `M${cx},${cy} L${startX},${cy} ${bypass ? `L${startX + bypass[0]},${cy + bypass[1]}` : ''} L${endX + (leftSide ? callouts?.textOffset ?? 0 : -1 * (callouts?.textOffset ?? 0))},${cy + (bypass?.[1] || 0)}`;
+
+          line.setAttribute('d', d);
+          line.setAttribute('fill','none');
+          line.setAttribute('stroke', callouts.lineColor ?? '#9CA3AF');
+          line.setAttribute('stroke-width', callouts.lineWidth ?? 1);
+          line.setAttribute('stroke-dasharray', callouts.lineDash ?? '0');
+          cg.appendChild(line);
+
+          const pin = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          pin.setAttribute('cx', cx);
+          pin.setAttribute('cy', cy);
+          pin.setAttribute('r', callouts.pinSize ?? '2');
+          pin.setAttribute('fill', callouts.pinColor ?? '#1B4EFF');
+          cg.appendChild(pin);
+
           const label = document.createElementNS('http://www.w3.org/2000/svg','text');
-          label.setAttribute('x', cx);
-          label.setAttribute('y', cy);
-          label.setAttribute('text-anchor', 'middle');
-          label.setAttribute('dominant-baseline', 'central');
-          label.setAttribute('font-size', opts.labels?.fontSize || 12);
-          label.setAttribute('font-weight', opts.labels?.fontWeight || 400);
-          label.setAttribute('fill', '#111827');
-          label.setAttribute('style', [
-            'pointer-events:none',
-            'paint-order:stroke',
-            'stroke:#FFFFFF',
-            `stroke-width:${opts.labels?.strokeWidth ?? 2.5}px`
-          ].join(';'));
-          label.textContent = name;
-          labelLayer.appendChild(label);
+          label.setAttribute('x', endX);
+          label.setAttribute('y', cy + (bypass?.[1] || 0));
+          label.setAttribute('text-anchor', leftSide ? 'end' : 'start');
+          label.setAttribute('dominant-baseline', 'middle');
+          label.setAttribute('font-size', callouts.textSize ?? 12);
+          label.setAttribute('font-weight', callouts.textWeight ?? 400);
+          label.setAttribute('fill', callouts.textColor ?? '#6B7280');
+
+          const countVal = opts.data?.[name]?.count;
+          label.textContent = `${name} : ${fmtInt(countVal)}`;
+          
+          cg.appendChild(label);
         }
-      }
-
-      const callouts = opts.callouts ?? {};
-      const showPin   = callouts.showPin ?? true;
-
-      const bbox = computeBBox(svg);
-      const vbStr = svg.getAttribute('viewBox');
-
-      let vx, vy, vw, vh;
-
-      if (vbStr) {
-        [vx, vy, vw, vh] = vbStr.split(/\s+/).map(Number);
-      } else {
-        vx = bbox.x; vy = bbox.y; vw = bbox.w; vh = bbox.h;
-
-        svg.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`);
-      }
-
-      const pad = (opts.callouts?.pad ?? 0);
-      const extra = (opts.callouts?.extra ?? 0);
-      const padding = pad + extra;
-
-      svg.setAttribute('viewBox', `${vx - padding} ${vy} ${vw + (padding * 2)} ${vh}`);
-      
-      const leftX  = bbox.x - pad;
-      const rightX = bbox.x + bbox.w + pad;
-
-      const cg = document.createElementNS('http://www.w3.org/2000/svg','g');
-      svg.appendChild(cg);
-
-      for (const [name, code] of Object.entries(NAME_TO_CODE)){
-        const path = svg.getElementById(code);
-        
-        if(!path) continue;
-
-        const b = path.getBBox();
-        let cx = b.x + b.width / 2;
-        let cy = b.y + b.height / 2;
-
-        const off = (callouts?.offsets && callouts.offsets[name]) || [0, 0];
-        const bypass = (callouts?.bypass && callouts.bypass[name]);
-
-        cx += off[0];
-        cy += off[1];
-
-        const leftSide = cx < bbox.cx;
-
-        const line = document.createElementNS('http://www.w3.org/2000/svg','path');
-
-        const startX = cx;
-        const endX = leftSide ? leftX : rightX;
-
-        const d = `M${cx},${cy} L${startX},${cy} ${bypass ? `L${startX + bypass[0]},${cy + bypass[1]}` : ''} L${endX + (leftSide ? callouts?.textOffset ?? 0 : -1 * (callouts?.textOffset ?? 0))},${cy + (bypass?.[1] || 0)}`;
-
-        line.setAttribute('d', d);
-        line.setAttribute('fill','none');
-        line.setAttribute('stroke', callouts.lineColor ?? '#9CA3AF');
-        line.setAttribute('stroke-width', callouts.lineWidth ?? 1);
-        line.setAttribute('stroke-dasharray', callouts.lineDash ?? '0');
-        cg.appendChild(line);
-
-        const pin = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        pin.setAttribute('cx', cx);
-        pin.setAttribute('cy', cy);
-        pin.setAttribute('r', callouts.pinSize ?? '2');
-        pin.setAttribute('fill', callouts.pinColor ?? '#1B4EFF');
-        cg.appendChild(pin);
-
-        const label = document.createElementNS('http://www.w3.org/2000/svg','text');
-        label.setAttribute('x', endX);
-        label.setAttribute('y', cy + (bypass?.[1] || 0));
-        label.setAttribute('text-anchor', leftSide ? 'end' : 'start');
-        label.setAttribute('dominant-baseline', 'middle');
-        label.setAttribute('font-size', callouts.textSize ?? 12);
-        label.setAttribute('font-weight', callouts.textWeight ?? 400);
-        label.setAttribute('fill', callouts.textColor ?? '#6B7280');
-
-        const countVal = opts.data?.[name]?.count;
-        label.textContent = `${name} : ${fmtInt(countVal)}`;
-        
-        cg.appendChild(label);
       }
     }
 
@@ -428,7 +398,7 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
 
     // ======== 실행 ========
     (async function(){
-      await renderRateMapWithBars('#korea-rates', {
+      await KorMapChart.renderRateMapWithBars('#korea-rates', {
         svgUrl: 'south_korea.svg',
         data: ratesData,
         rates: [0.8, 0.6, 0.4, 0.2],
@@ -439,8 +409,19 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
         },
         bar: {
           width: 400,
+          height: 16,
           gap: 16,
+          rowGap: 8,
           paddingTop: 20,
+          labelWidth: 56,
+          labelSize: 14,
+          labelWeight: 800,
+          labelColor: '#111827',
+          labelAlign: 'right',
+          rounded: 4,
+          valueSize: 12,
+          valueWeight: 400,
+          valueColor: '#111827',
         },
         labels: {
           fontSize: 12,
@@ -453,7 +434,7 @@ const colors = opts.colors || ['#00085A','#1F48FF','#1F48FF','#1F48FF','#D7D7D7'
         }
       });
 
-      await renderCountMap('#korea-counts', {
+      await KorMapChart.renderCountMap('#korea-counts', {
         svgUrl: 'south_korea.svg',
         data: countsData,
         rates: [0.8, 0.6, 0.4, 0.2],
