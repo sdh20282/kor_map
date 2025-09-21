@@ -24,7 +24,12 @@
  *     shadow: true,  // 기본 그림자 사용
  *     // 또는 커스텀 그림자:
  *     // shadow: { dx: 0, dy: 8, blur: 6, color: '#0000FF', opacity: 0.4 },
- *     hoverStyle: { opacity: 0.9, cursor: 'pointer' }
+ *     hoverStyle: { opacity: 0.9, cursor: 'pointer' },
+ *     // 지역별 커스텀 hover 스타일 (배경색 변경 가능):
+ *     regionHoverStyles: {
+ *       '서울': { opacity: 0.95, stroke: '#ff0000', strokeWidth: 2, fill: '#ffcccc' },
+ *       '제주': { opacity: 0.85, stroke: '#00ff00', strokeWidth: 3, fill: '#ccffcc' }
+ *     }
  *   }
  * });
  *
@@ -340,6 +345,7 @@ class KorMapChart {
   static #bindRegionEvents(svg, codeMap, opts, getDatum) {
     const ev = opts?.events || {};
     const hoverStyle = ev.hoverStyle || { opacity: 0.8, cursor: 'pointer' };
+    const regionHoverStyles = ev.regionHoverStyles || {};  // 지역별 커스텀 hover 스타일
     const shadow = ev.shadow;  // boolean 또는 object
 
     let shadowFilterId = null;
@@ -351,7 +357,15 @@ class KorMapChart {
     const apply = (el, styleObj) => {
       Object.entries(styleObj).forEach(([k, v]) => {
         if (v == null) el.style.removeProperty(k);
-        else el.style.setProperty(k.replace(/[A-Z]/g, m => '-' + m.toLowerCase()), String(v));
+        else {
+          const prop = k.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+          // fill의 경우 important로 설정하여 기존 스타일 오버라이드
+          if (prop === 'fill') {
+            el.style.setProperty(prop, String(v), 'important');
+          } else {
+            el.style.setProperty(prop, String(v));
+          }
+        }
       });
     };
 
@@ -364,7 +378,8 @@ class KorMapChart {
         strokeWidth: p.style.strokeWidth,
         opacity: p.style.opacity,
         cursor: p.style.cursor,
-        filter: p.style.filter
+        filter: p.style.filter,
+        fill: p.style.fill  // 배경색 저장
       };
 
       p.style.pointerEvents = 'auto';
@@ -373,7 +388,10 @@ class KorMapChart {
         // SVG에서 요소를 맨 위로 올리기 (z-index 효과)
         p.parentNode.appendChild(p);
 
-        apply(p, hoverStyle);
+        // 지역별 커스텀 스타일 또는 전역 스타일 적용
+        const styleToApply = regionHoverStyles[name] || hoverStyle;
+        apply(p, styleToApply);
+
         if (shadow && shadowFilterId) {
           p.style.filter = `url(#${shadowFilterId})`;
         }
@@ -382,6 +400,10 @@ class KorMapChart {
 
       p.addEventListener('mouseleave', (e) => {
         apply(p, orig);
+        // fill은 별도로 important로 복원
+        if (orig.fill !== undefined) {
+          p.style.setProperty('fill', orig.fill || '', 'important');
+        }
         if (shadow) {
           p.style.filter = orig.filter || '';
         }
