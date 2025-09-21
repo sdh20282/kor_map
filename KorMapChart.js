@@ -43,6 +43,7 @@
  *       offsets: { '서울': [5, 0] }  // 추가 오프셋
  *     }
  *   },
+ *   innerCities: ['광주', '대전'],  // 커스텀 내륙 도시 목록
  *   events: {
  *     shadow: true,
  *     hoverStyle: { opacity: 0.9, cursor: 'pointer' },
@@ -485,6 +486,7 @@ class KorMapChart {
     const hoverStyle = ev.hoverStyle || { opacity: 0.8, cursor: 'pointer' };
     const regionHoverStyles = ev.regionHoverStyles || {};  // 지역별 커스텀 hover 스타일
     const shadow = ev.shadow;  // boolean 또는 object
+    const innerCities = opts?.innerCities || [];
 
     let shadowFilterId = null;
     if (shadow) {
@@ -525,6 +527,16 @@ class KorMapChart {
       p.addEventListener('mouseenter', (e) => {
         // SVG에서 요소를 맨 위로 올리기 (z-index 효과)
         p.parentNode.appendChild(p);
+
+        // 내륙 도시들을 항상 맨 위에 유지
+        for (const [innerName, innerCode] of Object.entries(codeMap || {})) {
+          if (innerCities.includes(innerName) && innerName !== name) {
+            const innerPath = svg.getElementById(innerCode);
+            if (innerPath && innerPath.parentNode) {
+              innerPath.parentNode.appendChild(innerPath);
+            }
+          }
+        }
 
         // 지역별 커스텀 스타일 또는 전역 스타일 적용
         const styleToApply = regionHoverStyles[name] || hoverStyle;
@@ -581,6 +593,7 @@ class KorMapChart {
    *       strokeWidth?: number,
    *       strokeColor?: string
    *     }
+   *   - innerCities?: string[]  // hover 시에도 항상 최상단에 유지될 지역 목록 (기본: ['광주', '대전', '세종', '서울'])
    */
   static async render(codeMap, mount, opts) {
     const el = this.#ensureMount(mount);
