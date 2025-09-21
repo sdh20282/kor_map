@@ -2,7 +2,7 @@
 /**
  * KorMapChart v2 (vanilla JS)
  * - 하나의 클래스 + 하나의 entry 메서드(render)
- * - mode: 'rate+bars' | 'count+callouts' (미지정 시 bar/callouts 존재로 자동 판별)
+ * - mode: 'normal' | 'rate+bars' | 'count+callouts' (필수)
  * - 공통 개선:
  *   - SVG 원본 fill/styles 제거 일관화
  *   - 안전한 CSS setter(setCss)
@@ -11,8 +11,20 @@
  *   - 옵션 옵셔널 체이닝/기본값 정리
  *
  * @example
+ * // normal 모드 - 지도만 표시
  * KorMapChart.render(codeMap, '#mount', {
- *   mode: 'rate+bars',
+ *   mode: 'normal',  // 필수
+ *   svgUrl: '/maps/kr_sido.svg',
+ *   data: { 서울: 0.87, 경기: 0.63, 인천: 0.80 },
+ *   rates: [0.8, 0.6, 0.4, 0.2],
+ *   colors: ['#00085A', '#1F48FF', '#79a1ee', '#99d9f2', '#D7D7D7'],
+ *   map: { width: 420, height: 620 },
+ *   labels: { fontSize: 12, strokeWidth: 2.5, offsets: { '서울': [2, -2] } }
+ * });
+ *
+ * // rate+bars 모드 - bar 옵션 필수
+ * KorMapChart.render(codeMap, '#mount', {
+ *   mode: 'rate+bars',  // 필수
  *   svgUrl: '/maps/kr_sido.svg',
  *   data: { 서울: 0.87, 경기: 0.63, 인천: 0.80 },
  *   rates: [0.8, 0.6, 0.4, 0.2],
@@ -20,14 +32,15 @@
  *   gap: 24,
  *   map: { width: 420, height: 620 },
  *   labels: { fontSize: 12, strokeWidth: 2.5, offsets: { '서울': [2, -2] } },
- *   bar: { width: 180, height: 18, gap: 12, labelWidth: 56, rounded: 4 }
+ *   bar: { width: 180, height: 18, gap: 12, labelWidth: 56, rounded: 4 }  // 필수
  * });
  *
+ * // count+callouts 모드 - callouts 옵션 필수
  * KorMapChart.render(codeMap, document.getElementById('mount2'), {
- *   mode: 'count+callouts',
+ *   mode: 'count+callouts',  // 필수
  *   svgUrl: '/maps/kr_sido.svg',
  *   data: { 서울: { count: 4339, rate: 0.93 }, 경기: { count: 5331, rate: 0.63 } },
- *   callouts: {
+ *   callouts: {  // 필수
  *     padding: 32, margin: 12, textOffset: 8,
  *     lineColor: '#9CA3AF', lineWidth: 1, pinColor: '#1B4EFF', textColor: '#6B7280',
  *     offsets: { '서울': [2, -2] }, bypass: { '부산': [12, -10] },
@@ -327,7 +340,7 @@ class KorMapChart {
    * @param {Object.<string,string>} codeMap - 지역명 → SVG id (예: { '서울':'KR-11', ... })
    * @param {string|HTMLElement|SVGElement} mount - 렌더링 대상(셀렉터/DOM)
    * @param {Object} opts - 옵션(아래 참조)
-   *   - mode?: 'rate+bars' | 'count+callouts'
+   *   - mode: 'normal' | 'rate+bars' | 'count+callouts' (필수)
    *   - svgUrl: string
    *   - data: Record<string, number | { count?:number, rate?:number }>
    *   - rates?: number[]
@@ -360,7 +373,21 @@ class KorMapChart {
 
     const colorForRate = this.#makeColorForRate(opts?.rates, opts?.colors);
 
-    const mode = opts?.mode ?? (opts?.bar ? 'rate+bars' : (opts?.callouts ? 'count+callouts' : 'rate+bars'));
+    // mode는 필수
+    if (!opts?.mode) {
+      throw new Error('KorMapChart.render: mode는 필수입니다. ("normal" | "rate+bars" | "count+callouts")');
+    }
+
+    const mode = opts.mode;
+
+    // mode별 필수 옵션 검증
+    if (mode === 'rate+bars' && !opts?.bar) {
+      throw new Error('KorMapChart.render: "rate+bars" 모드에서는 bar 옵션이 필수입니다.');
+    }
+
+    if (mode === 'count+callouts' && !opts?.callouts) {
+      throw new Error('KorMapChart.render: "count+callouts" 모드에서는 callouts 옵션이 필수입니다.');
+    }
 
     const getRate = (name) => {
       const v = opts?.data?.[name];
@@ -380,5 +407,6 @@ class KorMapChart {
 
       this.#buildCallouts(svg, codeMap, opts?.data, bbox, opts?.callouts);
     }
+    // mode === 'normal'일 때는 지도만 표시하고 추가 요소 없음
   }
 }
