@@ -156,7 +156,7 @@ class KorMapChart {
 
   static #createPieChart(cx, cy, data, opts = {}) {
     const radius = opts.radius ?? 20;
-    const innerRadius = opts.innerRadius ?? 0;  // 도넛 차트를 위한 내부 반지름
+    const innerRadius = opts.innerRadius ?? 0;
     const strokeWidth = opts.strokeWidth ?? 1;
     const strokeColor = opts.strokeColor ?? '#ffffff';
 
@@ -186,8 +186,8 @@ class KorMapChart {
       const y2 = cy + radius * Math.sin(endAngleRad);
 
       let d;
+
       if (innerRadius > 0) {
-        // 도넛 차트
         const ix1 = cx + innerRadius * Math.cos(startAngleRad);
         const iy1 = cy + innerRadius * Math.sin(startAngleRad);
         const ix2 = cx + innerRadius * Math.cos(endAngleRad);
@@ -202,7 +202,6 @@ class KorMapChart {
           'Z'
         ].join(' ');
       } else {
-        // 일반 파이 차트
         const largeArcFlag = angle > 180 ? 1 : 0;
         d = [
           `M ${cx} ${cy}`,
@@ -217,7 +216,6 @@ class KorMapChart {
       path.setAttribute('stroke', strokeColor);
       path.setAttribute('stroke-width', strokeWidth);
 
-      // 툴팁 추가
       if (item.label) {
         const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
         title.textContent = `${item.label}: ${Math.round(percentage * 100)}%`;
@@ -268,7 +266,6 @@ class KorMapChart {
       label.textContent = name;
       layer.appendChild(label);
 
-      // 파이 차트 추가
       if (pieChartData?.[name]) {
         const pieOpts = labelOpts.pieChart || {};
         const position = pieOpts.positions?.[name] || pieOpts.position || 'right';
@@ -278,7 +275,6 @@ class KorMapChart {
         let pieX = cx;
         let pieY = cy;
 
-        // 위치 계산
         switch (position) {
           case 'top':
             pieY -= (gap + radius);
@@ -294,7 +290,6 @@ class KorMapChart {
             break;
         }
 
-        // 커스텀 오프셋 적용
         const pieOffset = pieOpts.offsets?.[name] || [0, 0];
         pieX += pieOffset[0];
         pieY += pieOffset[1];
@@ -550,10 +545,11 @@ class KorMapChart {
 
       p.addEventListener('mouseleave', (e) => {
         apply(p, orig);
-        // fill은 별도로 important로 복원
+
         if (orig.fill !== undefined) {
           p.style.setProperty('fill', orig.fill || '', 'important');
         }
+
         if (shadow) {
           p.style.filter = orig.filter || '';
         }

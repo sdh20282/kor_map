@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KorMapChart - Complete Single Example (Normal Mode)</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 40px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="complete-chart">
+    </div>
+  </div>
+
+  <script src="KorMapChart.js"></script>
+  <script>
+    // 지역 코드 매핑
+    const KOR_NAME_TO_CODE = {
+      '서울': 'KR-11',
+      '부산': 'KR-26',
+      '대구': 'KR-27',
+      '인천': 'KR-28',
+      '광주': 'KR-29',
+      '대전': 'KR-30',
+      '울산': 'KR-31',
+      '세종': 'KR-50',
+      '경기': 'KR-41',
+      '강원': 'KR-42',
+      '충북': 'KR-43',
+      '충남': 'KR-44',
+      '전북': 'KR-45',
+      '전남': 'KR-46',
+      '경북': 'KR-47',
+      '경남': 'KR-48',
+      '제주': 'KR-49',
+    };
+
+    // 메인 데이터
+    const rateData = {
+      '대구': 0.93,
+      '서울': 0.87,
+      '광주': 0.87,
+      '울산': 0.80,
+      '대전': 0.76,
+      '세종': 0.74,
+      '인천': 0.80,
+      '경기': 0.63,
+      '제주': 0.61,
+      '부산': 0.50,
+      '충남': 0.40,
+      '전북': 0.34,
+      '충북': 0.31,
+      '경북': 0.22,
+      '경남': 0.20,
+      '전남': 0.11,
+      '강원': 0.08,
+    };
+
+    // 파이차트 데이터 - 학교 구성
+    const schoolData = {
+      '서울': [
+        { label: '초등학교', data: 45, color: '#ff6384' },
+        { label: '중학교', data: 30, color: '#36a2eb' },
+        { label: '고등학교', data: 25, color: '#ffce56' }
+      ],
+      '경기': [
+        { label: '초등학교', data: 50, color: '#ff6384' },
+        { label: '중학교', data: 28, color: '#36a2eb' },
+        { label: '고등학교', data: 22, color: '#ffce56' }
+      ],
+      '부산': [
+        { label: '초등학교', data: 40, color: '#ff6384' },
+        { label: '중학교', data: 35, color: '#36a2eb' },
+        { label: '고등학교', data: 25, color: '#ffce56' }
+      ],
+      '인천': [
+        { label: '초등학교', data: 48, color: '#ff6384' },
+        { label: '중학교', data: 29, color: '#36a2eb' },
+        { label: '고등학교', data: 23, color: '#ffce56' }
+      ],
+    };
+
+    // 산업 구성 데이터 (도넛차트용)
+    const industryData = {
+      '광주': [
+        { label: '서비스업', data: 60, color: '#4bc0c0' },
+        { label: '제조업', data: 25, color: '#9966ff' },
+        { label: '기타', data: 15, color: '#ff9f40' }
+      ],
+      '대전': [
+        { label: '서비스업', data: 45, color: '#4bc0c0' },
+        { label: '제조업', data: 35, color: '#9966ff' },
+        { label: '기타', data: 20, color: '#ff9f40' }
+      ],
+      '제주': [
+        { label: '서비스업', data: 70, color: '#4bc0c0' },
+        { label: '관광업', data: 20, color: '#9966ff' },
+        { label: '농업', data: 10, color: '#ff9f40' }
+      ],
+      '울산': [
+        { label: '서비스업', data: 25, color: '#4bc0c0' },
+        { label: '제조업', data: 60, color: '#9966ff' },
+        { label: '기타', data: 15, color: '#ff9f40' }
+      ],
+      '강원': [
+        { label: '서비스업', data: 55, color: '#4bc0c0' },
+        { label: '관광업', data: 30, color: '#9966ff' },
+        { label: '농업', data: 15, color: '#ff9f40' }
+      ],
+    };
+
+    // 모든 파이차트 데이터 통합
+    const allPieData = { ...schoolData, ...industryData };
+
+    (async function() {
+      await KorMapChart.render(
+        KOR_NAME_TO_CODE,           // 지역명-코드 매핑
+        '#complete-chart',           // 마운트 대상
+        {
+          // ========== 필수 옵션 ==========
+          mode: 'normal',            // 렌더링 모드 (필수)
+          svgUrl: 'south_korea.svg', // SVG 파일 경로
+
+          // ========== 데이터 ==========
+          data: rateData,            // 메인 데이터 (비율/색상용)
+          pieChartData: allPieData,  // 파이차트 데이터
+
+          // ========== 색상 스케일 ==========
+          rates: [0.8, 0.6, 0.4, 0.2],  // 색상 구간 임계값
+          colors: [                      // 각 구간별 색상
+            '#00085A',  // 0.8 이상
+            '#1F48FF',  // 0.6~0.8
+            '#79a1ee',  // 0.4~0.6
+            '#99d9f2',  // 0.2~0.4
+            '#D7D7D7'   // 0.2 미만 (폴백)
+          ],
+
+          // ========== 내륙 도시 처리 ==========
+          innerCities: ['광주', '대전', '세종', '서울'],  // hover 시에도 최상단 유지
+
+          // ========== 맵 설정 ==========
+          map: {
+            width: 500,              // SVG 너비
+            height: 650              // SVG 높이 (옵션)
+          },
+
+          // ========== 라벨 설정 ==========
+          labels: {
+            fontSize: 13,            // 라벨 글자 크기
+            strokeWidth: 3,          // 라벨 외곽선 두께
+            fontWeight: 600,         // 라벨 글자 굵기
+            color: '#1f2937',        // 라벨 색상
+            minWidth: 16,            // 최소 너비 (이보다 작으면 라벨 없음)
+            minHeight: 12,           // 최소 높이
+
+            // 지역별 라벨 위치 조정
+            offsets: {
+              '경기': [15, 15],      // [x, y] 오프셋
+              '인천': [3, 0],
+              '충북': [-25, -25],
+              '경북': [25, -25],
+              '충남': [0, 10],
+              '전북': [0, 10],
+              '전남': [10, 0],
+              '경남': [10, 10]
+            },
+
+            // ========== 파이차트 설정 ==========
+            pieChart: {
+              position: 'right',     // 기본 위치 (top/bottom/left/right)
+
+              // 지역별 개별 위치 지정
+              positions: {
+                '서울': 'top',       // 서울은 위
+                '경기': 'bottom',    // 경기는 아래
+                '부산': 'right',     // 부산은 오른쪽
+                '인천': 'left',      // 인천은 왼쪽
+                '제주': 'bottom',    // 제주는 아래
+                '광주': 'left',      // 광주는 왼쪽 (내륙도시)
+                '대전': 'right',     // 대전은 오른쪽 (내륙도시)
+                '울산': 'bottom',    // 울산은 아래
+                '강원': 'top'        // 강원은 위
+              },
+
+              gap: 12,               // 라벨과 파이차트 간격
+              radius: 20,            // 파이차트 반지름
+              innerRadius: 10,       // 도넛 차트 내부 반지름 (0이면 일반 파이)
+              strokeWidth: 0.5,      // 파이 조각 테두리 두께
+              strokeColor: '#ffffff', // 파이 조각 테두리 색상
+
+              // 지역별 추가 오프셋 (미세 조정용)
+              offsets: {
+                '서울': [0, 0],
+                '제주': [0, 10],
+                '광주': [-15, 0],
+                '대전': [10, 0],
+                '강원': [0, -10]
+              }
+            }
+          },
+
+          // ========== 이벤트 & 인터랙션 ==========
+          events: {
+            // 그림자 효과 설정
+            shadow: {
+              dx: 0,                 // X축 오프셋 (0 = 중앙)
+              dy: 4,                // Y축 오프셋 (양수 = 하단)
+              blur: 0,               // 블러 강도
+              color: '#000000',      // 그림자 색상
+              opacity: 1           // 그림자 불투명도
+            },
+
+            // 기본 hover 스타일
+            hoverStyle: {
+              opacity: 0.85,
+              cursor: 'pointer'
+            },
+
+            // 지역별 커스텀 hover 스타일
+            regionHoverStyles: {
+              // 수도권 - 빨간색 테마
+              '서울': {
+                opacity: 0.95,
+                stroke: '#dc2626',
+                strokeWidth: 3,
+                fill: '#fee2e2'      // 배경색 변경
+              },
+              '인천': {
+                opacity: 0.95,
+                stroke: '#dc2626',
+                strokeWidth: 3,
+                fill: '#fee2e2'
+              },
+              '경기': {
+                opacity: 0.95,
+                stroke: '#dc2626',
+                strokeWidth: 3,
+                fill: '#fee2e2'
+              },
+
+              // 제주/강원 - 초록색 테마
+              '제주': {
+                opacity: 0.9,
+                stroke: '#16a34a',
+                strokeWidth: 3,
+                fill: '#dcfce7'
+              },
+              '강원': {
+                opacity: 0.9,
+                stroke: '#16a34a',
+                strokeWidth: 3,
+                fill: '#dcfce7'
+              },
+
+              // 남부지역 - 파란색 테마
+              '전남': {
+                opacity: 0.85,
+                stroke: '#2563eb',
+                strokeWidth: 2.5,
+                fill: '#dbeafe'
+              },
+              '전북': {
+                opacity: 0.85,
+                stroke: '#2563eb',
+                strokeWidth: 2.5,
+                fill: '#dbeafe'
+              },
+              '경남': {
+                opacity: 0.85,
+                stroke: '#2563eb',
+                strokeWidth: 2.5,
+                fill: '#dbeafe'
+              },
+              '경북': {
+                opacity: 0.85,
+                stroke: '#2563eb',
+                strokeWidth: 2.5,
+                fill: '#dbeafe'
+              },
+
+              // 광역시 - 보라색 테마
+              '부산': {
+                opacity: 0.9,
+                stroke: '#9333ea',
+                strokeWidth: 3,
+                fill: '#f3e8ff'
+              },
+              '대구': {
+                opacity: 0.9,
+                stroke: '#9333ea',
+                strokeWidth: 3,
+                fill: '#f3e8ff'
+              },
+              '광주': {
+                opacity: 1,
+                stroke: '#9333ea',
+                strokeWidth: 3,
+                fill: '#f3e8ff'
+              },
+              '대전': {
+                opacity: 1,
+                stroke: '#9333ea',
+                strokeWidth: 3,
+                fill: '#f3e8ff'
+              },
+              '울산': {
+                opacity: 0.9,
+                stroke: '#9333ea',
+                strokeWidth: 3,
+                fill: '#f3e8ff'
+              },
+
+              // 충청도 - 주황색 테마
+              '충남': {
+                opacity: 0.85,
+                stroke: '#ea580c',
+                strokeWidth: 2.5,
+                fill: '#fed7aa'
+              },
+              '충북': {
+                opacity: 0.85,
+                stroke: '#ea580c',
+                strokeWidth: 2.5,
+                fill: '#fed7aa'
+              },
+              '세종': {
+                opacity: 1,
+                stroke: '#ea580c',
+                strokeWidth: 3,
+                fill: '#fed7aa'
+              }
+            },
+
+            // 이벤트 핸들러
+            onRegionEnter: (name, el, data) => {
+              const pieData = allPieData[name];
+              const rate = (data * 100).toFixed(1);
+
+              if (pieData) {
+                const summary = pieData.map(d =>
+                  `${d.label}:${d.data}%`
+                ).join(', ');
+              }
+            },
+
+            onRegionLeave: (name, el, data) => {
+              // Leave 이벤트 (필요시 활용)
+            },
+
+            onRegionClick: (name, el, data) => {
+              const rate = (data * 100).toFixed(1);
+              const pieData = allPieData[name];
+
+              let message = `🗺️ ${name} 클릭!\n확보율: ${rate}%`;
+
+              if (pieData) {
+                message += '\n\n📊 세부 데이터:';
+                pieData.forEach(d => {
+                  message += `\n• ${d.label}: ${d.data}%`;
+                });
+              }
+
+              alert(message);
+            }
+          }
+        }
+      );
+    })();
+  </script>
+</body>
+</html>
