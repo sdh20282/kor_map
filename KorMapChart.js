@@ -19,7 +19,13 @@
  *   rates: [0.8, 0.6, 0.4, 0.2],
  *   colors: ['#00085A', '#1F48FF', '#79a1ee', '#99d9f2', '#D7D7D7'],
  *   map: { width: 420, height: 620 },
- *   labels: { fontSize: 12, strokeWidth: 2.5, offsets: { '서울': [2, -2] } }
+ *   labels: { fontSize: 12, strokeWidth: 2.5, offsets: { '서울': [2, -2] } },
+ *   events: {
+ *     shadow: true,  // 기본 그림자 사용
+ *     // 또는 커스텀 그림자:
+ *     // shadow: { dx: 0, dy: 8, blur: 6, color: '#0000FF', opacity: 0.4 },
+ *     hoverStyle: { opacity: 0.9, cursor: 'pointer' }
+ *   }
  * });
  *
  * // rate+bars 모드 - bar 옵션 필수
@@ -32,7 +38,11 @@
  *   gap: 24,
  *   map: { width: 420, height: 620 },
  *   labels: { fontSize: 12, strokeWidth: 2.5, offsets: { '서울': [2, -2] } },
- *   bar: { width: 180, height: 18, gap: 12, labelWidth: 56, rounded: 4 }  // 필수
+ *   bar: { width: 180, height: 18, gap: 12, labelWidth: 56, rounded: 4 },  // 필수
+ *   events: {
+ *     shadow: { dy: 10, blur: 5, opacity: 0.35 },  // 커스텀 하단 그림자
+ *     hoverStyle: { opacity: 0.9, cursor: 'pointer' }
+ *   }
  * });
  *
  * // count+callouts 모드 - callouts 옵션 필수
@@ -45,6 +55,10 @@
  *     lineColor: '#9CA3AF', lineWidth: 1, pinColor: '#1B4EFF', textColor: '#6B7280',
  *     offsets: { '서울': [2, -2] }, bypass: { '부산': [12, -10] },
  *     formatter: (name, count) => `${name} : ${count?.toLocaleString('ko-KR') ?? '-'}`
+ *   },
+ *   events: {
+ *     shadow: { dy: 8, blur: 4, color: '#1B4EFF', opacity: 0.2 },  // 파란색 하단 그림자
+ *     hoverStyle: { opacity: 0.9, cursor: 'pointer' }
  *   }
  * });
  */
@@ -294,9 +308,45 @@ class KorMapChart {
     }
   }
 
+  static #createShadowFilter(svg, shadowOpts = {}) {
+    const defs = svg.querySelector('defs') || (() => {
+      const d = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      svg.prepend(d);
+      return d;
+    })();
+
+    const filterId = 'drop-shadow-' + Math.random().toString(36).substr(2, 9);
+
+    const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+    filter.setAttribute('id', filterId);
+    filter.setAttribute('x', '-50%');
+    filter.setAttribute('y', '-50%');
+    filter.setAttribute('width', '200%');
+    filter.setAttribute('height', '200%');
+
+    const feDropShadow = document.createElementNS('http://www.w3.org/2000/svg', 'feDropShadow');
+    feDropShadow.setAttribute('dx', String(shadowOpts.dx ?? 0));
+    feDropShadow.setAttribute('dy', String(shadowOpts.dy ?? 6));  // 하단 그림자를 위해 기본값 증가
+    feDropShadow.setAttribute('stdDeviation', String(shadowOpts.blur ?? 4));
+    feDropShadow.setAttribute('flood-color', shadowOpts.color ?? '#000000');
+    feDropShadow.setAttribute('flood-opacity', String(shadowOpts.opacity ?? 0.3));
+
+    filter.appendChild(feDropShadow);
+    defs.appendChild(filter);
+
+    return filterId;
+  }
+
   static #bindRegionEvents(svg, codeMap, opts, getDatum) {
     const ev = opts?.events || {};
     const hoverStyle = ev.hoverStyle || { opacity: 0.8, cursor: 'pointer' };
+    const shadow = ev.shadow;  // boolean 또는 object
+
+    let shadowFilterId = null;
+    if (shadow) {
+      const shadowOpts = (typeof shadow === 'object') ? shadow : {};
+      shadowFilterId = this.#createShadowFilter(svg, shadowOpts);
+    }
 
     const apply = (el, styleObj) => {
       Object.entries(styleObj).forEach(([k, v]) => {
@@ -313,18 +363,28 @@ class KorMapChart {
         stroke: p.style.stroke,
         strokeWidth: p.style.strokeWidth,
         opacity: p.style.opacity,
-        cursor: p.style.cursor
+        cursor: p.style.cursor,
+        filter: p.style.filter
       };
 
       p.style.pointerEvents = 'auto';
 
       p.addEventListener('mouseenter', (e) => {
+        // SVG에서 요소를 맨 위로 올리기 (z-index 효과)
+        p.parentNode.appendChild(p);
+
         apply(p, hoverStyle);
+        if (shadow && shadowFilterId) {
+          p.style.filter = `url(#${shadowFilterId})`;
+        }
         ev.onRegionEnter?.(name, p, getDatum(name), e);
       });
 
       p.addEventListener('mouseleave', (e) => {
         apply(p, orig);
+        if (shadow) {
+          p.style.filter = orig.filter || '';
+        }
         ev.onRegionLeave?.(name, p, getDatum(name), e);
       });
 
