@@ -11,21 +11,41 @@
  *   - 옵션 옵셔널 체이닝/기본값 정리
  *
  * @example
- * // normal 모드 - 지도만 표시
+ * // normal 모드 - 지도만 표시 + 파이 차트
  * KorMapChart.render(codeMap, '#mount', {
  *   mode: 'normal',  // 필수
  *   svgUrl: '/maps/kr_sido.svg',
  *   data: { 서울: 0.87, 경기: 0.63, 인천: 0.80 },
+ *   pieChartData: {
+ *     '서울': [
+ *       { label: '카테고리1', data: 30, color: '#ff6384' },
+ *       { label: '카테고리2', data: 50, color: '#36a2eb' },
+ *       { label: '카테고리3', data: 20, color: '#ffce56' }
+ *     ],
+ *     '경기': [
+ *       { label: '타입A', data: 40, color: '#4bc0c0' },
+ *       { label: '타입B', data: 60, color: '#9966ff' }
+ *     ]
+ *   },
  *   rates: [0.8, 0.6, 0.4, 0.2],
  *   colors: ['#00085A', '#1F48FF', '#79a1ee', '#99d9f2', '#D7D7D7'],
  *   map: { width: 420, height: 620 },
- *   labels: { fontSize: 12, strokeWidth: 2.5, offsets: { '서울': [2, -2] } },
+ *   labels: {
+ *     fontSize: 12,
+ *     strokeWidth: 2.5,
+ *     offsets: { '서울': [2, -2] },
+ *     pieChart: {
+ *       position: 'right',  // 기본 위치
+ *       positions: { '서울': 'bottom', '제주': 'top' },  // 지역별 위치
+ *       gap: 20,
+ *       radius: 18,
+ *       innerRadius: 8,  // 도넛 차트로 표시
+ *       offsets: { '서울': [5, 0] }  // 추가 오프셋
+ *     }
+ *   },
  *   events: {
- *     shadow: true,  // 기본 그림자 사용
- *     // 또는 커스텀 그림자:
- *     // shadow: { dx: 0, dy: 8, blur: 6, color: '#0000FF', opacity: 0.4 },
+ *     shadow: true,
  *     hoverStyle: { opacity: 0.9, cursor: 'pointer' },
- *     // 지역별 커스텀 hover 스타일 (배경색 변경 가능):
  *     regionHoverStyles: {
  *       '서울': { opacity: 0.95, stroke: '#ff0000', strokeWidth: 2, fill: '#ffcccc' },
  *       '제주': { opacity: 0.85, stroke: '#00ff00', strokeWidth: 3, fill: '#ccffcc' }
@@ -133,7 +153,84 @@ class KorMapChart {
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2 };
   }
 
-  static #placeRegionLabels(svg, codeMap, labelOpts = {}) {
+  static #createPieChart(cx, cy, data, opts = {}) {
+    const radius = opts.radius ?? 20;
+    const innerRadius = opts.innerRadius ?? 0;  // 도넛 차트를 위한 내부 반지름
+    const strokeWidth = opts.strokeWidth ?? 1;
+    const strokeColor = opts.strokeColor ?? '#ffffff';
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+    // 데이터 합계 계산
+    const total = data.reduce((sum, item) => sum + (item.data || 0), 0);
+    if (total === 0) return g;
+
+    let currentAngle = -90;  // 12시 방향에서 시작
+
+    data.forEach((item) => {
+      const value = item.data || 0;
+      const percentage = value / total;
+      const angle = percentage * 360;
+
+      if (angle === 0) return;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+
+      const startAngleRad = (currentAngle * Math.PI) / 180;
+      const endAngleRad = ((currentAngle + angle) * Math.PI) / 180;
+
+      const x1 = cx + radius * Math.cos(startAngleRad);
+      const y1 = cy + radius * Math.sin(startAngleRad);
+      const x2 = cx + radius * Math.cos(endAngleRad);
+      const y2 = cy + radius * Math.sin(endAngleRad);
+
+      let d;
+      if (innerRadius > 0) {
+        // 도넛 차트
+        const ix1 = cx + innerRadius * Math.cos(startAngleRad);
+        const iy1 = cy + innerRadius * Math.sin(startAngleRad);
+        const ix2 = cx + innerRadius * Math.cos(endAngleRad);
+        const iy2 = cy + innerRadius * Math.sin(endAngleRad);
+
+        const largeArcFlag = angle > 180 ? 1 : 0;
+        d = [
+          `M ${x1} ${y1}`,
+          `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+          `L ${ix2} ${iy2}`,
+          `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${ix1} ${iy1}`,
+          'Z'
+        ].join(' ');
+      } else {
+        // 일반 파이 차트
+        const largeArcFlag = angle > 180 ? 1 : 0;
+        d = [
+          `M ${cx} ${cy}`,
+          `L ${x1} ${y1}`,
+          `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+          'Z'
+        ].join(' ');
+      }
+
+      path.setAttribute('d', d);
+      path.setAttribute('fill', item.color || '#cccccc');
+      path.setAttribute('stroke', strokeColor);
+      path.setAttribute('stroke-width', strokeWidth);
+
+      // 툴팁 추가
+      if (item.label) {
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = `${item.label}: ${Math.round(percentage * 100)}%`;
+        path.appendChild(title);
+      }
+
+      g.appendChild(path);
+      currentAngle += angle;
+    });
+
+    return g;
+  }
+
+  static #placeRegionLabels(svg, codeMap, labelOpts = {}, pieChartData = {}) {
     const layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     svg.appendChild(layer);
 
@@ -169,6 +266,47 @@ class KorMapChart {
       ].join(';'));
       label.textContent = name;
       layer.appendChild(label);
+
+      // 파이 차트 추가
+      if (pieChartData?.[name]) {
+        const pieOpts = labelOpts.pieChart || {};
+        const position = pieOpts.positions?.[name] || pieOpts.position || 'right';
+        const gap = pieOpts.gap ?? 15;
+        const radius = pieOpts.radius ?? 15;
+
+        let pieX = cx;
+        let pieY = cy;
+
+        // 위치 계산
+        switch (position) {
+          case 'top':
+            pieY -= (gap + radius);
+            break;
+          case 'bottom':
+            pieY += (gap + radius);
+            break;
+          case 'left':
+            pieX -= (gap + radius);
+            break;
+          case 'right':
+            pieX += (gap + radius);
+            break;
+        }
+
+        // 커스텀 오프셋 적용
+        const pieOffset = pieOpts.offsets?.[name] || [0, 0];
+        pieX += pieOffset[0];
+        pieY += pieOffset[1];
+
+        const pie = this.#createPieChart(pieX, pieY, pieChartData[name], {
+          radius: radius,
+          innerRadius: pieOpts.innerRadius ?? 0,
+          strokeWidth: pieOpts.strokeWidth ?? 0.5,
+          strokeColor: pieOpts.strokeColor ?? '#ffffff'
+        });
+
+        layer.appendChild(pie);
+      }
     }
   }
 
@@ -432,6 +570,17 @@ class KorMapChart {
    *   - labels?: { ... see original ... }
    *   - bar?: { ... see original ... }    // mode가 'rate+bars'일 때
    *   - callouts?: { ... see original ... } // mode가 'count+callouts'일 때
+   *   - pieChartData?: { [지역명]: [{label: string, data: number, color: string}] }
+   *   - labels.pieChart?: {
+   *       position?: 'top' | 'bottom' | 'left' | 'right',
+   *       positions?: { [지역명]: 'top' | 'bottom' | 'left' | 'right' },
+   *       gap?: number,
+   *       radius?: number,
+   *       innerRadius?: number,  // 도넛 차트를 위한 내부 반지름
+   *       offsets?: { [지역명]: [x, y] },
+   *       strokeWidth?: number,
+   *       strokeColor?: string
+   *     }
    */
   static async render(codeMap, mount, opts) {
     const el = this.#ensureMount(mount);
@@ -478,7 +627,7 @@ class KorMapChart {
     };
 
     this.#paintRegions(svg, codeMap, getRate.bind(this), colorForRate);
-    this.#placeRegionLabels(svg, codeMap, opts?.labels);
+    this.#placeRegionLabels(svg, codeMap, opts?.labels, opts?.pieChartData);
 
     this.#bindRegionEvents(svg, codeMap, opts, (n) => opts?.data?.[n]);
 
