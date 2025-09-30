@@ -540,28 +540,28 @@ KorMapChartES5._bindRegionEvents = function (svg, codeMap, opts, getDatum) {
         var p = svg.getElementById(code);
         if (!p) return;
 
-        // SVG에서 요소를 맨 위로 올리기
-        p.parentNode.appendChild(p);
+        // 내륙 도시가 아닐 때만 z-index 재배치
+        var isInnerCity = innerCities.indexOf(name) !== -1;
 
-        // 선택된 요소를 그 위에 유지
-        if (selectedPath && selectedPath.parentNode) {
-          selectedPath.parentNode.appendChild(selectedPath);
-        }
-
-        // 현재 호버 중인 요소를 맨 위로 (최상위)
-        if (p.parentNode) {
+        if (!isInnerCity) {
+          // SVG에서 요소를 맨 위로 올리기
           p.parentNode.appendChild(p);
-        }
 
-        // 내륙 도시들을 항상 최상위에 유지 (현재 호버 중인 요소 제외)
-        for (var innerName in codeMap) {
-          if (!codeMap.hasOwnProperty(innerName)) continue;
+          // 선택된 요소를 그 위에 유지
+          if (selectedPath && selectedPath.parentNode) {
+            selectedPath.parentNode.appendChild(selectedPath);
+          }
 
-          var innerCode = codeMap[innerName];
-          if (innerCities.indexOf(innerName) !== -1 && innerName !== name) {
-            var innerPath = svg.getElementById(innerCode);
-            if (innerPath && innerPath.parentNode) {
-              innerPath.parentNode.appendChild(innerPath);
+          // 내륙 도시들을 항상 최상위에 유지
+          for (var innerName in codeMap) {
+            if (!codeMap.hasOwnProperty(innerName)) continue;
+
+            var innerCode = codeMap[innerName];
+            if (innerCities.indexOf(innerName) !== -1) {
+              var innerPath = svg.getElementById(innerCode);
+              if (innerPath && innerPath.parentNode) {
+                innerPath.parentNode.appendChild(innerPath);
+              }
             }
           }
         }
