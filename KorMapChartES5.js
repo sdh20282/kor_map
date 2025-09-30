@@ -19,47 +19,47 @@
  *   }
  * });
  */
-function KorMapChartES5() {}
+function KorMapChartES5() { }
 
 // 정적 메서드들을 생성자 함수에 직접 할당
-KorMapChartES5._loadSVG = function(url) {
+KorMapChartES5._loadSVG = function (url) {
   return fetch(url)
-    .then(function(res) {
+    .then(function (res) {
       return res.text();
     })
-    .then(function(txt) {
+    .then(function (txt) {
       var doc = new DOMParser().parseFromString(txt, 'image/svg+xml');
       return doc.documentElement;
     });
 };
 
-KorMapChartES5._setCss = function(el, prop, v) {
+KorMapChartES5._setCss = function (el, prop, v) {
   if (!el || !prop) return;
   if (v == null) el.style.removeProperty(prop);
   else el.style.setProperty(prop, v);
 };
 
-KorMapChartES5._fmtPct = function(x) {
+KorMapChartES5._fmtPct = function (x) {
   return (x == null || Number.isNaN(x)) ? '-' : Math.round(x * 100) + '%';
 };
 
-KorMapChartES5._fmtInt = function(n) {
+KorMapChartES5._fmtInt = function (n) {
   return (n == null || Number.isNaN(n)) ? '-' : Number(n).toLocaleString('ko-KR');
 };
 
-KorMapChartES5._clamp01 = function(v) {
+KorMapChartES5._clamp01 = function (v) {
   var n = Number(v);
   if (!Number.isFinite(n)) return null;
   return Math.min(1, Math.max(0, n));
 };
 
-KorMapChartES5._makeColorForRate = function(thresholds, colors) {
+KorMapChartES5._makeColorForRate = function (thresholds, colors) {
   var th = Array.isArray(thresholds) && thresholds.length ? thresholds : [0.8, 0.6, 0.4, 0.2];
   var cs = Array.isArray(colors) && colors.length ? colors : ['#00085A', '#1F48FF', '#79a1ee', '#99d9f2', '#D7D7D7'];
   var lastIndex = cs.length - 1;
   var fallback = lastIndex >= 0 && cs[lastIndex] != null ? cs[lastIndex] : '#D7D7D7';
 
-  return function(rRaw) {
+  return function (rRaw) {
     var r = KorMapChartES5._clamp01(rRaw);
     if (r == null) return fallback;
     for (var i = 0; i < th.length; i++) {
@@ -72,7 +72,7 @@ KorMapChartES5._makeColorForRate = function(thresholds, colors) {
   };
 };
 
-KorMapChartES5._clearSvgFillStyles = function(svg) {
+KorMapChartES5._clearSvgFillStyles = function (svg) {
   var styles = svg.querySelectorAll('style');
   for (var i = 0; i < styles.length; i++) {
     var s = styles[i];
@@ -85,11 +85,11 @@ KorMapChartES5._clearSvgFillStyles = function(svg) {
   }
 };
 
-KorMapChartES5._ensureMount = function(mount) {
+KorMapChartES5._ensureMount = function (mount) {
   return (typeof mount === 'string') ? document.querySelector(mount) : mount;
 };
 
-KorMapChartES5._computeBBox = function(svg) {
+KorMapChartES5._computeBBox = function (svg) {
   var paths = svg.querySelectorAll('path');
   var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
@@ -110,7 +110,7 @@ KorMapChartES5._computeBBox = function(svg) {
   };
 };
 
-KorMapChartES5._createPieChart = function(cx, cy, data, opts) {
+KorMapChartES5._createPieChart = function (cx, cy, data, opts) {
   opts = opts || {};
   var radius = opts.radius != null ? opts.radius : 20;
   var innerRadius = opts.innerRadius != null ? opts.innerRadius : 0;
@@ -190,7 +190,7 @@ KorMapChartES5._createPieChart = function(cx, cy, data, opts) {
   return g;
 };
 
-KorMapChartES5._placeRegionLabels = function(svg, codeMap, labelOpts, pieChartData) {
+KorMapChartES5._placeRegionLabels = function (svg, codeMap, labelOpts, pieChartData) {
   labelOpts = labelOpts || {};
   pieChartData = pieChartData || {};
 
@@ -274,7 +274,7 @@ KorMapChartES5._placeRegionLabels = function(svg, codeMap, labelOpts, pieChartDa
   }
 };
 
-KorMapChartES5._paintRegions = function(svg, codeMap, dataGetter, colorForRate) {
+KorMapChartES5._paintRegions = function (svg, codeMap, dataGetter, colorForRate) {
   for (var name in codeMap) {
     if (!codeMap.hasOwnProperty(name)) continue;
 
@@ -287,7 +287,7 @@ KorMapChartES5._paintRegions = function(svg, codeMap, dataGetter, colorForRate) 
   }
 };
 
-KorMapChartES5._buildBars = function(wrap, dataMap, colorForRate, barOpts) {
+KorMapChartES5._buildBars = function (wrap, dataMap, colorForRate, barOpts) {
   barOpts = barOpts || {};
   dataMap = dataMap || {};
 
@@ -306,7 +306,7 @@ KorMapChartES5._buildBars = function(wrap, dataMap, colorForRate, barOpts) {
     entries.push([name, (rate == null ? -Infinity : rate)]);
   }
 
-  entries.sort(function(a, b) { return b[1] - a[1]; });
+  entries.sort(function (a, b) { return b[1] - a[1]; });
 
   for (var i = 0; i < entries.length; i++) {
     var entry = entries[i];
@@ -356,7 +356,7 @@ KorMapChartES5._buildBars = function(wrap, dataMap, colorForRate, barOpts) {
   wrap.appendChild(list);
 };
 
-KorMapChartES5._buildCallouts = function(svg, codeMap, dataMap, bbox, calloutOpts) {
+KorMapChartES5._buildCallouts = function (svg, codeMap, dataMap, bbox, calloutOpts) {
   calloutOpts = calloutOpts || {};
   dataMap = dataMap || {};
 
@@ -439,7 +439,7 @@ KorMapChartES5._buildCallouts = function(svg, codeMap, dataMap, bbox, calloutOpt
   }
 };
 
-KorMapChartES5._createShadowFilter = function(svg, shadowOpts) {
+KorMapChartES5._createShadowFilter = function (svg, shadowOpts) {
   shadowOpts = shadowOpts || {};
 
   var defs = svg.querySelector('defs');
@@ -472,7 +472,7 @@ KorMapChartES5._createShadowFilter = function(svg, shadowOpts) {
   return filterId;
 };
 
-KorMapChartES5._bindRegionEvents = function(svg, codeMap, opts, getDatum) {
+KorMapChartES5._bindRegionEvents = function (svg, codeMap, opts, getDatum) {
   opts = opts || {};
   var ev = opts.events || {};
   var hoverStyle = ev.hoverStyle || { opacity: 0.8, cursor: 'pointer' };
@@ -486,7 +486,9 @@ KorMapChartES5._bindRegionEvents = function(svg, codeMap, opts, getDatum) {
     shadowFilterId = KorMapChartES5._createShadowFilter(svg, shadowOpts);
   }
 
-  var apply = function(el, styleObj) {
+  var selectedPath = null;
+
+  var apply = function (el, styleObj) {
     for (var k in styleObj) {
       if (!styleObj.hasOwnProperty(k)) continue;
 
@@ -494,7 +496,7 @@ KorMapChartES5._bindRegionEvents = function(svg, codeMap, opts, getDatum) {
       if (v == null) {
         el.style.removeProperty(k);
       } else {
-        var prop = k.replace(/[A-Z]/g, function(m) { return '-' + m.toLowerCase(); });
+        var prop = k.replace(/[A-Z]/g, function (m) { return '-' + m.toLowerCase(); });
         if (prop === 'fill') {
           el.style.setProperty(prop, String(v), 'important');
         } else {
@@ -504,16 +506,54 @@ KorMapChartES5._bindRegionEvents = function(svg, codeMap, opts, getDatum) {
     }
   };
 
-  var createEventHandler = function(name, code) {
+  var selectRegion = function (path, name) {
+    if (!path) return;
+    selectedPath = path;
+
+    var styleToApply = regionHoverStyles[name] || hoverStyle;
+    apply(path, styleToApply);
+
+    if (shadow && shadowFilterId) {
+      path.style.filter = 'url(#' + shadowFilterId + ')';
+    }
+  };
+
+  var deselectRegion = function () {
+    if (!selectedPath) return;
+
+    apply(selectedPath, selectedPath._originalStyles);
+
+    if (selectedPath._originalStyles.fill !== undefined) {
+      selectedPath.style.setProperty('fill', selectedPath._originalStyles.fill || '', 'important');
+    }
+
+    if (shadow) {
+      selectedPath.style.filter = selectedPath._originalStyles.filter || '';
+    }
+
+    selectedPath = null;
+  };
+
+  var createEventHandler = function (name, code) {
     return {
-      mouseenter: function(e) {
+      mouseenter: function (e) {
         var p = svg.getElementById(code);
         if (!p) return;
 
         // SVG에서 요소를 맨 위로 올리기
         p.parentNode.appendChild(p);
 
-        // 내륙 도시들을 항상 맨 위에 유지
+        // 선택된 요소를 그 위에 유지
+        if (selectedPath && selectedPath.parentNode) {
+          selectedPath.parentNode.appendChild(selectedPath);
+        }
+
+        // 현재 호버 중인 요소를 맨 위로 (최상위)
+        if (p.parentNode) {
+          p.parentNode.appendChild(p);
+        }
+
+        // 내륙 도시들을 항상 최상위에 유지 (현재 호버 중인 요소 제외)
         for (var innerName in codeMap) {
           if (!codeMap.hasOwnProperty(innerName)) continue;
 
@@ -539,9 +579,17 @@ KorMapChartES5._bindRegionEvents = function(svg, codeMap, opts, getDatum) {
         }
       },
 
-      mouseleave: function(e) {
+      mouseleave: function (e) {
         var p = svg.getElementById(code);
         if (!p) return;
+
+        // If this region is selected, don't remove hover styles
+        if (p === selectedPath) {
+          if (ev.onRegionLeave) {
+            ev.onRegionLeave(name, p, getDatum(name), e);
+          }
+          return;
+        }
 
         apply(p, p._originalStyles);
 
@@ -558,9 +606,24 @@ KorMapChartES5._bindRegionEvents = function(svg, codeMap, opts, getDatum) {
         }
       },
 
-      click: function(e) {
+      click: function (e) {
         var p = svg.getElementById(code);
         if (!p) return;
+
+        // Handle selection
+        if (selectedPath && selectedPath !== p) {
+          // Deselect previous region
+          deselectRegion();
+        }
+
+        // Select this region (or keep it selected if already selected)
+        if (selectedPath !== p) {
+          selectRegion(p, name);
+          // 선택된 요소를 맨 위로 올리기
+          if (p.parentNode) {
+            p.parentNode.appendChild(p);
+          }
+        }
 
         if (ev.onRegionClick) {
           ev.onRegionClick(name, p, getDatum(name), e);
@@ -593,10 +656,18 @@ KorMapChartES5._bindRegionEvents = function(svg, codeMap, opts, getDatum) {
     p.addEventListener('mouseleave', handlers.mouseleave);
     p.addEventListener('click', handlers.click);
   }
+
+  // Add window click handler for deselecting when clicking on empty areas
+  window.addEventListener('click', function (e) {
+    // Check if the click target is the SVG itself (not a path or other element)
+    if (e.target === svg || e.target.tagName === 'svg') {
+      deselectRegion();
+    }
+  });
 };
 
 // 메인 렌더 메서드
-KorMapChartES5.render = function(codeMap, mount, opts) {
+KorMapChartES5.render = function (codeMap, mount, opts) {
   opts = opts || {};
 
   var el = KorMapChartES5._ensureMount(mount);
@@ -611,7 +682,7 @@ KorMapChartES5.render = function(codeMap, mount, opts) {
   KorMapChartES5._setCss(el, 'flex-shrink', '0');
   KorMapChartES5._setCss(el, 'gap', (opts.gap != null) ? opts.gap + 'px' : null);
 
-  return KorMapChartES5._loadSVG(opts.svgUrl).then(function(svg) {
+  return KorMapChartES5._loadSVG(opts.svgUrl).then(function (svg) {
     KorMapChartES5._setCss(svg, 'width', (opts.map && opts.map.width != null) ? opts.map.width + 'px' : null);
     KorMapChartES5._setCss(svg, 'height', (opts.map && opts.map.height != null) ? opts.map.height + 'px' : null);
     el.appendChild(svg);
@@ -636,7 +707,7 @@ KorMapChartES5.render = function(codeMap, mount, opts) {
       throw new Error('KorMapChartES5.render: "count+callouts" 모드에서는 callouts 옵션이 필수입니다.');
     }
 
-    var getRate = function(name) {
+    var getRate = function (name) {
       var v = opts.data && opts.data[name];
       if (v == null) return null;
       return (typeof v === 'number') ? v : v.rate;
@@ -645,7 +716,7 @@ KorMapChartES5.render = function(codeMap, mount, opts) {
     KorMapChartES5._paintRegions(svg, codeMap, getRate, colorForRate);
     KorMapChartES5._placeRegionLabels(svg, codeMap, opts.labels, opts.pieChartData);
 
-    KorMapChartES5._bindRegionEvents(svg, codeMap, opts, function(n) { return opts.data && opts.data[n]; });
+    KorMapChartES5._bindRegionEvents(svg, codeMap, opts, function (n) { return opts.data && opts.data[n]; });
 
     if (mode === 'rate+bars') {
       KorMapChartES5._buildBars(el, opts.data, colorForRate, opts.bar);
@@ -659,7 +730,7 @@ KorMapChartES5.render = function(codeMap, mount, opts) {
 
 // ES5에서 Array.at() 폴리필
 if (!Array.prototype.at) {
-  Array.prototype.at = function(index) {
+  Array.prototype.at = function (index) {
     if (index < 0) {
       index = this.length + index;
     }
@@ -669,14 +740,14 @@ if (!Array.prototype.at) {
 
 // ES5에서 Number.isNaN 폴리필
 if (!Number.isNaN) {
-  Number.isNaN = function(value) {
+  Number.isNaN = function (value) {
     return typeof value === 'number' && isNaN(value);
   };
 }
 
 // ES5에서 Number.isFinite 폴리필
 if (!Number.isFinite) {
-  Number.isFinite = function(value) {
+  Number.isFinite = function (value) {
     return typeof value === 'number' && isFinite(value);
   };
 }
