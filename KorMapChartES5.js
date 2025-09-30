@@ -623,6 +623,19 @@ KorMapChartES5._bindRegionEvents = function (svg, codeMap, opts, getDatum) {
           if (p.parentNode) {
             p.parentNode.appendChild(p);
           }
+
+          // 내륙 도시들을 항상 최상위에 유지
+          for (var innerName in codeMap) {
+            if (!codeMap.hasOwnProperty(innerName)) continue;
+
+            var innerCode = codeMap[innerName];
+            if (innerCities.indexOf(innerName) !== -1) {
+              var innerPath = svg.getElementById(innerCode);
+              if (innerPath && innerPath.parentNode) {
+                innerPath.parentNode.appendChild(innerPath);
+              }
+            }
+          }
         }
 
         if (ev.onRegionClick) {
